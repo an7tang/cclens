@@ -1,0 +1,114 @@
+  /* Dual palette: light is the default; dark overrides via prefers-color-scheme — follows the system theme automatically.
+     Semantic variables map one-to-one (GitHub Primer light ↔ the original GitHub Dark).
+
+     Two light-mode-only rules (in dark mode the values degenerate to the originals, leaving dark pixels unchanged):
+     - Role colors split into "foreground/fill" groups: foreground colors like --user guarantee text contrast on white;
+       fill colors like --user-fill (Primer scale 3-4 midtones) are for charts/bars —
+       foreground colors look heavy and muddy as large fills on white; midtones are the brightness charts should have;
+     - Badge knobs --badge-*: in light mode type badges are drawn as "tinted background + colored text + thin ring";
+       in dark mode tint=100%/ink=0%/ring=0% is exactly the original "solid fill + inverted text". */
+  /* Palette shares its source with the main cclens dashboard (style.css tokens): warm paper background + the s1-s8 series colors.
+     Role colors are this view's own semantic scale (user blue/assistant purple/tool orange/…), but the values come from the same series —
+     the two views share one palette while each defines its own semantics; visually they're one family. */
+  :root {
+    color-scheme: light dark;
+    --bg: #f9f9f7; --panel: #fcfcfb; --panel2: #f1f0eb; --border: rgba(11,11,11,0.10);
+    --text: #0b0b0b; --dim: #52514e; --faint: #898781;
+    --user: #2a78d6; --assistant: #4a3aa7; --tool: #eb6834;
+    --toolresult: color-mix(in srgb, #eda100 78%, #0b0b0b);
+    --thinking: #898781; --system: #008300; --warning: #d03b3b; --meta: #898781;
+    --accent: #2a78d6; --branch: #256abf; --compact: #008300;
+    --code-bg: #f2f1ed; --code-fg: #0b0b0b;
+    /* JSON syntax highlighting: same Primer-style palette as lens */
+    --json-key: #0550ae; --json-str: #0a3069; --json-num: #953800; --json-kw: #cf222e;
+    /* Fill colors (charts/bars): foreground colors are too heavy as large fills, so use midtones */
+    --user-fill: #86b6ef; --assistant-fill: color-mix(in srgb, #4a3aa7 52%, white);
+    --thinking-fill: #c9c7bf;
+    --tool-fill: color-mix(in srgb, #eb6834 65%, white);
+    --toolresult-fill: color-mix(in srgb, #eda100 72%, white);
+    --system-fill: color-mix(in srgb, #008300 50%, white);
+    --meta-fill: #c9c7bf; --warning-fill: color-mix(in srgb, #d03b3b 58%, white);
+    /* Token series colors align with the role colors: blue = input side, purple = output side; cache read recedes to the faintest neutral background */
+    --tok-output: color-mix(in srgb, #4a3aa7 52%, white); --tok-input: #86b6ef;
+    --tok-write: color-mix(in srgb, #eda100 72%, white); --tok-read: #c9c7bf;
+    --tok-advisor: #e87ba4;
+    --bar-shadow: rgba(255,255,255,0.85);
+    --badge-tint: 13%; --badge-ink: 100%; --badge-ring: 28%;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0d0d; --panel: #1a1a19; --panel2: #222220; --border: rgba(255,255,255,0.10);
+      --text: #ffffff; --dim: #c3c2b7; --faint: #898781;
+      --user: #3987e5; --assistant: #9085e9; --tool: #d95926; --toolresult: #c98500;
+      --thinking: #898781; --system: #0ca30c; --warning: #e66767; --meta: #898781;
+      --accent: #3987e5; --branch: #86b6ef; --compact: #0ca30c;
+      --code-bg: #141413; --code-fg: #c3c2b7;
+      --json-key: #79c0ff; --json-str: #a5d6ff; --json-num: #ffa657; --json-kw: #ff7b72;
+      --user-fill: #3987e5; --assistant-fill: #9085e9; --thinking-fill: #55544f;
+      --tool-fill: #d95926; --toolresult-fill: #c98500; --system-fill: #0ca30c;
+      --meta-fill: #4a4a46; --warning-fill: #e66767;
+      --tok-output: #9085e9; --tok-input: #3987e5; --tok-write: #c98500; --tok-read: #3a3a37;
+      --tok-advisor: #d55181;
+      --bar-shadow: rgba(0,0,0,0.85);
+      --badge-tint: 100%; --badge-ink: 0%; --badge-ring: 0%;
+    }
+  }
+  :root {
+    /* Collapse caret glyph (chevron-right): colored via CSS mask + background, rotates 90° with [open] */
+    --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 18 15 12 9 6'/%3E%3C/svg%3E");
+  }
+  /* Unified inline SVG icons (Feather-style 24×24 stroke) — inherit the surrounding text color */
+  .ic2 { stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round;
+         stroke-linejoin: round; vertical-align: -1.5px; flex-shrink: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5;
+         font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 20px 80px; }
+  a { color: var(--accent); text-decoration: none; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+              background: var(--system); margin-right: 6px; vertical-align: 1px; }
+  .live-dot.off { background: var(--warning); }
+  .live-dot.pulse { animation: pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.25; } }
+
+  /* ---- Unified topbar (same spec as the API dashboard, geometry pixel-aligned: dot x16 · brand x36 · switch x136) ----
+     Always pinned: the API view's topbar is naturally fixed by its internal-scroll layout; sticky here matches that behavior */
+  header.topbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    position: sticky; top: 0; z-index: 60;
+  }
+  header.topbar .live-dot { margin-right: 0; vertical-align: 0; }
+  header.topbar .brand { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: .2px;
+                         color: var(--text); line-height: 1.2; }
+  .view-switch {
+    display: flex; align-items: center; gap: 2px;
+    padding: 2px; border: 1px solid var(--border); border-radius: 8px;
+    background: color-mix(in srgb, var(--text) 3.5%, transparent);
+    flex: 0 0 auto;
+  }
+  .view-switch a {
+    padding: 2px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 500;
+    color: var(--faint); text-decoration: none; line-height: 18px; white-space: nowrap;
+  }
+  .view-switch a:hover { color: var(--text); }
+  .view-switch a.active {
+    color: var(--text); background: var(--panel);
+    box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgba(0,0,0,.06);
+  }
+
+  /* ---- Floating tooltip (same component spec as the API view) ---- */
+  #tooltip {
+    position: fixed; z-index: 80; pointer-events: none; display: none;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.18);
+    padding: 8px 10px; font-size: 11px; min-width: 150px; max-width: 320px; color: var(--dim);
+  }
+  #tooltip .tt-title { font-weight: 650; color: var(--text); margin-bottom: 4px; font-size: 11px; }
+  #tooltip .tt-row { display: flex; align-items: center; gap: 6px; margin: 2px 0; color: var(--dim); }
+  #tooltip .tt-row .k { width: 14px; height: 2px; border-radius: 1px; flex: 0 0 auto; }
+  #tooltip .tt-row b { color: var(--text); font-variant-numeric: tabular-nums;
+                       margin-left: auto; padding-left: 12px; font-weight: 600; }

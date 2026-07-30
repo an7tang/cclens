@@ -1,0 +1,43 @@
+{
+  "name": "cclens",
+  "version": "0.1.0",
+  "description": "See what Claude Code is actually doing \u2014 a local, zero-dependency dashboard that records API requests, transcripts, and hook events, woven into one timeline",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "observability",
+    "devtools",
+    "proxy",
+    "transcript",
+    "hooks",
+    "dashboard"
+  ],
+  "homepage": "https://github.com/an7tang/cclens#readme",
+  "bugs": {
+    "url": "https://github.com/an7tang/cclens/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/an7tang/cclens.git"
+  },
+  "license": "MIT",
+  "author": "an7tang",
+  "bin": {
+    "cclens": "bin/cclens.js"
+  },
+  "files": [
+    "bin/",
+    "public/",
+    "server.js",
+    "hooks.js",
+    "transcripts.js",
+    "paths.js"
+  ],
+  "scripts": {
+    "start": "node bin/cclens.js",
+    "demo": "node mock/demo.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

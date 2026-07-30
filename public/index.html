@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cclens · Claude Code API dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='none' stroke='%232a78d6' stroke-width='2'/%3E%3Ccircle cx='8' cy='8' r='2.4' fill='%232a78d6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="live-dot" id="live-dot" title="Live connection status"></div>
+    <h1 title="Claude Code dashboard">cclens</h1>
+    <nav class="view-switch" title="Two observation layers: API = proxy layer (cache/retries/auxiliary/SSE timing) · Transcript = session semantic layer (conversation tree/record stream)">
+      <a class="active" href="/">API</a>
+      <a id="vs-transcripts" href="/transcripts">Transcript</a>
+    </nav>
+    <div class="search-wrap">
+      <svg class="search-icon" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><line x1="10.6" y1="10.6" x2="14" y2="14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input id="search" type="search" placeholder="Search captured content" autocomplete="off" spellcheck="false">
+      <kbd class="search-key" aria-hidden="true"></kbd>
+      <div id="search-results" hidden></div>
+    </div>
+    <div class="topbar-meta" id="topbar-meta"></div>
+  </header>
+  <main>
+    <nav id="sidebar"></nav>
+    <div id="content">
+      <div id="session-pane"></div>
+      <div id="split-handle" title="Drag to adjust the pane split · double-click to reset"></div>
+      <aside id="detail-pane"></aside>
+    </div>
+  </main>
+</div>
+<div id="tooltip"></div>
+<script src="/app.js"></script>
+</body>
+</html>

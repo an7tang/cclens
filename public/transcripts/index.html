@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Code Sessions</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23161b22'/%3E%3Ctext x='8' y='12' font-size='10' text-anchor='middle' fill='%2358a6ff' font-family='monospace'%3E%7B%7D%3C/text%3E%3C/svg%3E">
+<style>
+/*BASE*/
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 16px;
+                  font-size: 12.5px; color: var(--dim); }
+  #totals { color: var(--dim); }
+  #status { color: var(--dim); }
+  #crumb { font-size: 13px; margin-bottom: 14px; color: var(--dim); }
+  #crumb b { color: var(--text); font-weight: 550; font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
+  #search { background: var(--panel); border: 1px solid var(--border); color: var(--text);
+            border-radius: 6px; padding: 7px 12px; font-size: 13px; width: 280px;
+            outline: none; margin-bottom: 18px; }
+  #search:focus { border-color: var(--accent); }
+  h2.sect { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.8px;
+            margin: 22px 0 10px; font-weight: 600; }
+  h2.sect:first-child { margin-top: 0; }
+  .proj-name { font-size: 12px; color: var(--dim); margin: 18px 0 8px;
+               font-family: ui-monospace, Menlo, monospace; }
+  .row { display: flex; align-items: center; gap: 14px;
+         background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+         padding: 10px 16px; margin-bottom: 6px; color: var(--text); transition: border-color .12s;
+         cursor: pointer; }
+  .row:hover { border-color: var(--accent); }
+  .row .icon { flex-shrink: 0; width: 20px; height: 20px; display: flex; align-items: center;
+               justify-content: center; }
+  .row .icon svg { width: 16px; height: 16px; }
+  .row.sess { border-left: 3px solid var(--border); padding-left: 13px; }
+  .row.sess .icon svg { stroke: var(--faint); }
+  .row .main { flex: 1; min-width: 0; }
+  .row .title { font-weight: 550; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .sub { font-size: 12px; color: var(--faint); white-space: nowrap; overflow: hidden;
+              text-overflow: ellipsis; font-family: ui-monospace, Menlo, monospace; margin-top: 2px; }
+  .row .right { text-align: right; flex-shrink: 0; }
+  .row .when { font-size: 12.5px; color: var(--dim); }
+  .row .size { font-size: 11.5px; color: var(--faint); font-family: ui-monospace, Menlo, monospace; }
+  .badge-live { font-size: 10px; font-weight: 700; color: var(--system); border: 1px solid var(--system);
+                border-radius: 999px; padding: 1px 8px; letter-spacing: 0.5px; flex-shrink: 0; }
+  .badge-pr { font-size: 10px; font-weight: 700; color: var(--accent); border: 1px solid var(--accent);
+              border-radius: 999px; padding: 1px 8px; letter-spacing: 0.5px; flex-shrink: 0; }
+  .badge-pr:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .badge-api { font-size: 10px; font-weight: 700; color: var(--dim); border: 1px solid var(--dim);
+                border-radius: 999px; padding: 1px 8px; letter-spacing: 0.5px; flex-shrink: 0; }
+  .badge-api:hover { background: color-mix(in srgb, var(--dim) 14%, transparent); }
+  .empty { color: var(--faint); font-style: italic; padding: 30px 0; text-align: center; }
+  .root-path { color: var(--faint); font-weight: 400; text-transform: none; letter-spacing: 0;
+               font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; margin-left: 10px; }
+  details.tbranch > summary { list-style: none; }
+  .trow { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 6px;
+          cursor: pointer; user-select: none; }
+  .trow:hover { background: var(--panel); }
+  .trow .tri { width: 11px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  details.tbranch > summary .tri::before { content: ""; display: inline-block; width: 9px; height: 9px;
+    background: var(--faint); -webkit-mask: var(--chev) center / contain no-repeat;
+    mask: var(--chev) center / contain no-repeat; transition: transform .12s; }
+  details[open].tbranch > summary .tri::before { transform: rotate(90deg); }
+  .trow .icon { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; }
+  .trow .icon svg { width: 15px; height: 15px; stroke: var(--dim); }
+  .trow.tleaf .icon svg { stroke: var(--accent); }
+  .tname { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--dim); }
+  .trow.tleaf .tname { color: var(--text); font-weight: 600; }
+  .trow.tleaf:hover .tname { color: var(--accent); }
+  .tmeta { margin-left: auto; color: var(--faint); font-size: 11px;
+           font-family: ui-monospace, Menlo, monospace; flex-shrink: 0; }
+  .tkids { margin-left: 15px; padding-left: 9px; border-left: 1px solid var(--border); }
+  .adot { width: 7px; height: 7px; border-radius: 50%; background: var(--system);
+          flex-shrink: 0; animation: pulse 1.6s ease-in-out infinite; }
+  /* The activity dot lights only at the deepest visible level: once a folder is expanded the dot lives deeper down, so the parent stops blinking redundantly;
+     when collapsed, the dot returns to the collapsed level, meaning "activity inside". Pure CSS follows the open/closed state — no re-render needed */
+  details.tbranch[open] > summary .adot { display: none; }
+  details.nest[open] > summary .badge-live { display: none; }
+  details.nest { margin: -2px 0 10px 40px; }
+  details.nest > summary { cursor: pointer; user-select: none; list-style: none;
+    display: flex; align-items: center; gap: 8px;
+    border: 1px dashed var(--border); border-radius: 8px;
+    padding: 6px 14px; font-size: 12px; color: var(--dim);
+    transition: border-color .12s, color .12s; }
+  details.nest > summary:hover { border-color: var(--accent); color: var(--text); }
+  details.nest > summary .branch { color: var(--faint); display: inline-flex; align-items: center; }
+  details.nest > summary .branch svg { width: 12px; height: 12px; stroke: currentColor; fill: none;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  details.nest > summary .tri::before { content: ""; display: inline-block; width: 9px; height: 9px;
+    background: var(--faint); -webkit-mask: var(--chev) center / contain no-repeat;
+    mask: var(--chev) center / contain no-repeat; transition: transform .12s; }
+  details[open].nest > summary { margin-bottom: 6px; border-style: solid; }
+  details[open].nest > summary .tri::before { transform: rotate(90deg); }
+  details.nest > summary .meta { color: var(--faint); font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; }
+  details.nest .row { padding-top: 7px; padding-bottom: 7px; }
+  details.nest .row .title { font-size: 13px; }
+  .chip-sub { background: var(--panel2); border: 1px solid var(--border); border-radius: 999px;
+              padding: 0px 8px; font-size: 10.5px; color: var(--dim);
+              font-family: ui-monospace, Menlo, monospace; margin-right: 6px; }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <span class="live-dot" id="dot" title="Live polling status"></span>
+  <h1 class="brand" title="Claude Code dashboard">cclens</h1>
+  <nav class="view-switch" title="Two observation layers: API = proxy layer · Transcript = session semantic layer">
+    <a href="/">API</a>
+    <a class="active" href="/transcripts" onclick="if(location.hash){location.hash='';render();return false}">Transcript</a>
+  </nav>
+  <span class="topbar-right">
+    <span id="totals"></span>
+    <span id="status"><span id="status-text">connecting…</span></span>
+  </span>
+</header>
+<div class="wrap">
+  <div id="crumb" style="display:none"></div>
+  <input id="search" type="search" placeholder="Search all sessions…">
+  <div id="list"><div class="empty">loading…</div></div>
+</div>
+<script>
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtSize = b => b >= 1048576 ? (b/1048576).toFixed(1)+' MB' : b >= 1024 ? (b/1024).toFixed(0)+' KB' : b+' B';
+function relTime(epoch) {
+  const s = Date.now()/1000 - epoch;
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  if (s < 86400) return Math.floor(s/3600) + 'h ago';
+  if (s < 86400*30) return Math.floor(s/86400) + 'd ago';
+  return new Date(epoch*1000).toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'numeric'});
+}
+const decodeProj = p => p.replace(/^-/, '/').replace(/-/g, '/'); // lossy: only a fallback when no record carried a cwd
+// Real cwd recorded in the session takes precedence over the lossy directory-name decode
+const projCwd = {};
+const projLabel = p => projCwd[p] || decodeProj(p);
+let sessions = [];
+
+// Set of session ids captured at the API layer (for cross-layer jumps; cclens and transcripts share session ids)
+let apiIds = new Set();
+async function loadApiIds() {
+  try {
+    const o = await (await fetch('/__lens/overview')).json();
+    apiIds = new Set((o.sessions || []).map(x => x.id));
+    lastSig = null; // badge data arrived; force a re-render on the next tick
+  } catch {}
+}
+loadApiIds();
+setInterval(loadApiIds, 60000);
+
+function curProject() {
+  const m = /^#p=(.+)$/.exec(location.hash);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+const ICON_DOC = `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>`;
+const ICON_FOLDER = `<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+
+function sessionRow(s, withProject, chip) {
+  const now = Date.now()/1000;
+  return `
+    <div class="row sess" onclick="location.href='/transcripts/viewer?path=${encodeURIComponent(s.path)}'">
+      <span class="icon">${ICON_DOC}</span>
+      <div class="main">
+        <div class="title">${chip ? `<span class="chip-sub">${esc(chip)}</span>` : ''}${esc(s.title || s.firstPrompt || s.file)}</div>
+        <div class="sub">${withProject ? esc(projLabel(s.project)) + ' · ' : ''}${esc(s.sessionId ? s.sessionId.slice(0,8) : s.file)}${s.models.length ? ' · ' + esc(s.models.join(', ')) : ''}${s.firstPrompt && s.title ? ' · ' + esc(s.firstPrompt.slice(0,90)) : ''}</div>
+      </div>
+      ${s.pr ? `<a class="badge-pr" href="${esc(s.pr.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="${esc(s.pr.url)}">PR #${esc(s.pr.n)}</a>` : ''}
+      ${apiIds.has(s.sessionId) ? `<a class="badge-api" href="/#s=${encodeURIComponent(s.sessionId)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open in the API dashboard (the proxy layer captured this session)">API</a>` : ''}
+      ${now - s.mtime < 120 ? '<span class="badge-live">ACTIVE</span>' : ''}
+      <div class="right">
+        <div class="when">${relTime(s.mtime)}</div>
+        <div class="size">${fmtSize(s.size)}</div>
+      </div>
+    </div>`;
+}
+
+const stem = f => f.replace(/\.jsonl$/, '');
+
+// ---------- folder tree (layer 1) ----------
+const closedBranches = new Set(JSON.parse(localStorage.getItem('cv-closed') || '[]'));
+function branchToggle(el) {
+  const p = el.dataset.path;
+  if (el.open) closedBranches.delete(p); else closedBranches.add(p);
+  localStorage.setItem('cv-closed', JSON.stringify([...closedBranches]));
+}
+// remember which nested-transcript blocks are unfolded so the 2.5s poll re-render keeps them open
+const openNests = new Set();
+function nestToggle(el) {
+  const k = el.dataset.nest;
+  if (!k) return;
+  if (el.open) openNests.add(k); else openNests.delete(k);
+}
+function buildTree(projs) {
+  const mk = name => ({name, children: new Map(), proj: null});
+  const root = mk('');
+  projs.forEach(p => {
+    let node = root;
+    projLabel(p.key).split('/').filter(Boolean).forEach(seg => {
+      if (!node.children.has(seg)) node.children.set(seg, mk(seg));
+      node = node.children.get(seg);
+    });
+    node.proj = p;
+  });
+  // merge single-child directory chains: a/b/c becomes one node
+  (function compress(n) {
+    const merged = [...n.children.values()].map(ch => {
+      while (!ch.proj && ch.children.size === 1) {
+        const only = [...ch.children.values()][0];
+        only.name = ch.name + '/' + only.name;
+        ch = only;
+      }
+      compress(ch);
+      return ch;
+    });
+    n.children = new Map(merged.map(ch => [ch.name, ch]));
+  })(root);
+  // hoist the common prefix into the root label
+  let r = root, prefix = '';
+  while (!r.proj && r.children.size === 1) {
+    const only = [...r.children.values()][0];
+    prefix += '/' + only.name;
+    r = only;
+  }
+  r.name = prefix;
+  // aggregate counts/sizes/recency, sort children by recency
+  (function agg(n) {
+    const a = {n: 0, size: 0, mtime: 0, active: false};
+    if (n.proj) { a.n = n.proj.n; a.size = n.proj.size; a.mtime = n.proj.mtime; a.active = n.proj.active; }
+    n.children.forEach(ch => {
+      const c = agg(ch);
+      a.n += c.n; a.size += c.size; a.mtime = Math.max(a.mtime, c.mtime); a.active = a.active || c.active;
+    });
+    n.agg = a;
+    n.children = new Map([...n.children.entries()].sort((x,y) => y[1].agg.mtime - x[1].agg.mtime));
+    return a;
+  })(r);
+  return r;
+}
+function projLeaf(node, inFolder) {
+  const p = node.proj;
+  return `
+    <div class="trow tleaf" onclick="location.hash='p=${encodeURIComponent(p.key)}'" title="${esc(projLabel(p.key))}">
+      <span class="tri"></span>
+      <span class="icon">${ICON_FOLDER}</span>
+      <span class="tname">${esc(inFolder ? './' : node.name)}</span>
+      ${p.active ? '<span class="adot" title="active now"></span>' : ''}
+      <span class="tmeta">${p.n} · ${fmtSize(p.size)} · ${relTime(p.mtime)}</span>
+    </div>`;
+}
+function renderNode(node, path) {
+  if (node.proj && node.children.size === 0) return projLeaf(node, false);
+  const a = node.agg;
+  return `
+    <details class="tbranch" data-path="${esc(path)}" ontoggle="branchToggle(this)" ${closedBranches.has(path) ? '' : 'open'}>
+      <summary class="trow">
+        <span class="tri"></span>
+        <span class="icon">${ICON_FOLDER}</span>
+        <span class="tname">${esc(node.name)}</span>
+        ${a.active ? '<span class="adot" title="active now"></span>' : ''}
+        <span class="tmeta">${a.n} · ${fmtSize(a.size)} · ${relTime(a.mtime)}</span>
+      </summary>
+      <div class="tkids">
+        ${node.proj ? projLeaf(node, true) : ''}
+        ${[...node.children.values()].map(ch => renderNode(ch, path + '/' + ch.name)).join('')}
+      </div>
+    </details>`;
+}
+function shortSub(sub) {
+  const rest = sub.split('/').slice(1).map(seg => seg.length > 14 ? seg.slice(0, 11) + '…' : seg).join('/');
+  return rest || 'subagents';
+}
+function nestBlock(ss, pid, forceOpen, key) {
+  ss = [...ss].sort((a,b) => b.mtime - a.mtime);
+  const size = ss.reduce((a,s) => a+s.size, 0);
+  const active = ss.some(s => Date.now()/1000 - s.mtime < 120);
+  const label = pid
+    ? `transcripts of unknown session <span class="meta">${esc(pid.slice(0,8))}…</span>`
+    : `subagent &amp; workflow transcript${ss.length>1?'s':''}`;
+  const isOpen = forceOpen || openNests.has(key);
+  return `
+    <details class="nest" data-nest="${esc(key)}" ontoggle="nestToggle(this)" ${isOpen ? 'open' : ''}>
+      <summary><span class="tri"></span><span class="branch"><svg viewBox="0 0 24 24"><polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/></svg></span>
+        ${ss.length} ${label}
+        <span class="meta">· ${fmtSize(size)} · ${relTime(ss[0].mtime)}</span>
+        ${active ? '<span class="badge-live">ACTIVE</span>' : ''}
+      </summary>
+      ${ss.map(s => sessionRow(s, false, s.agentName || shortSub(s.sub))).join('')}
+    </details>`;
+}
+
+function render() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const proj = curProject();
+  const crumb = document.getElementById('crumb');
+  const list = document.getElementById('list');
+  const byTime = (a,b) => b.mtime - a.mtime;
+  const now = Date.now()/1000;
+
+  if (proj !== null) {
+    // ----- layer 2: sessions of one project -----
+    crumb.style.display = '';
+    crumb.innerHTML = `<a href="#" style="display:inline-flex;align-items:center;gap:4px"><svg style="width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg> all projects</a> &nbsp;/&nbsp; <b>${esc(projLabel(proj))}</b>`;
+    document.getElementById('search').placeholder = 'Search in this project…';
+    let items = sessions.filter(s => s.project === proj).sort(byTime);
+    if (q) items = items.filter(s =>
+      [s.title, s.firstPrompt, s.sessionId, s.file, s.sub, s.agentName].join(' ').toLowerCase().includes(q));
+    const main = items.filter(s => !s.sub);
+    const nested = items.filter(s => s.sub);
+    const byParent = {};
+    nested.forEach(s => {
+      const pid = s.sub.split('/')[0];
+      (byParent[pid] = byParent[pid] || []).push(s);
+    });
+    let html = main.map(s => {
+      const kids = byParent[stem(s.file)];
+      if (kids) delete byParent[stem(s.file)];
+      return sessionRow(s, false) + (kids ? nestBlock(kids, null, !!q, s.path) : '');
+    }).join('');
+    const orphans = Object.entries(byParent)
+      .sort((a,b) => Math.max(...b[1].map(s=>s.mtime)) - Math.max(...a[1].map(s=>s.mtime)));
+    if (orphans.length) {
+      html += `<h2 class="sect">Nested transcripts without a parent session here</h2>` +
+        orphans.map(([pid, ss]) => nestBlock(ss, pid, !!q, 'orphan:' + pid)).join('');
+    }
+    list.innerHTML = html || '<div class="empty">no sessions match</div>';
+  } else if (q) {
+    // ----- global search: flat matching sessions grouped by project -----
+    crumb.style.display = 'none';
+    document.getElementById('search').placeholder = 'Search all sessions…';
+    const hits = sessions.filter(s =>
+      [s.title, s.firstPrompt, s.project, s.sub, s.sessionId, s.file, s.agentName].join(' ').toLowerCase().includes(q));
+    const groups = {};
+    hits.forEach(s => (groups[s.project] = groups[s.project] || []).push(s));
+    const gs = Object.entries(groups)
+      .map(([k, v]) => [k, v.sort(byTime)])
+      .sort((a,b) => b[1][0].mtime - a[1][0].mtime);
+    list.innerHTML = gs.length ? gs.map(([p, items]) => `
+      <div class="proj-name"><a href="#p=${encodeURIComponent(p)}">${esc(projLabel(p))}</a> · ${items.length} match${items.length>1?'es':''}</div>
+      ${items.map(s => sessionRow(s, false, s.sub ? (s.agentName || shortSub(s.sub)) : null)).join('')}`).join('')
+      : '<div class="empty">no sessions match</div>';
+  } else {
+    // ----- layer 1: recent activity + project list -----
+    crumb.style.display = 'none';
+    document.getElementById('search').placeholder = 'Search all sessions…';
+    const recent = sessions.filter(s => !s.sub).sort(byTime).slice(0, 5);
+    const groups = {};
+    sessions.forEach(s => (groups[s.project] = groups[s.project] || []).push(s));
+    const projs = Object.entries(groups)
+      .map(([k, v]) => {
+        const mains = v.filter(s => !s.sub);
+        return {
+          key: k, n: v.length,
+          size: v.reduce((a,s) => a+s.size, 0),
+          mtime: Math.max(...v.map(s => s.mtime)),
+          latest: (mains.length ? mains : v).reduce((a,s) => s.mtime > a.mtime ? s : a),
+          active: v.some(s => now - s.mtime < 120),
+        };
+      });
+    const tree = buildTree(projs);
+    list.innerHTML =
+      '<h2 class="sect">Recent activity</h2>' +
+      recent.map(s => sessionRow(s, true)).join('') +
+      `<h2 class="sect">Projects${tree.name ? `<span class="root-path">${esc(tree.name)}</span>` : ''}</h2>` +
+      (tree.proj ? projLeaf(tree, true) : '') +
+      [...tree.children.values()].map(ch => renderNode(ch, ch.name)).join('');
+  }
+  const totalB = sessions.reduce((a,s) => a+s.size, 0);
+  document.getElementById('totals').textContent =
+    `${sessions.length} sessions · ${new Set(sessions.map(s=>s.project)).size} projects · ${fmtSize(totalB)}`;
+  lastRender = Date.now();
+}
+
+// First principles: render() is a pure function of (data, search, hash). The poll's job is to
+// detect data changes, not to blindly rebuild the DOM — rebuilding the list under the cursor was
+// what made hover effects flicker every tick. So: render only when the data signature changes
+// (the common case is identical data), plus an occasional time-only refresh while not hovering.
+let lastSig = null, lastRender = 0, listHover = false;
+const sessionsSig = ss => ss.map(s => s.path + '\t' + s.size + '\t' + s.mtime).join('\n');
+
+async function tick() {
+  let data;
+  try { data = await (await fetch('/__viewer/sessions')).json(); }
+  catch (e) {
+    document.getElementById('dot').className = 'live-dot off';
+    document.getElementById('status-text').textContent = 'server unreachable — retrying…';
+    return;
+  }
+  sessions = data;
+  for (const s of sessions) if (s.cwd && !projCwd[s.project]) projCwd[s.project] = s.cwd;
+  document.getElementById('dot').className = 'live-dot pulse';
+  document.getElementById('status-text').textContent = 'live · updated ' + new Date().toLocaleTimeString('en-GB');
+  const sig = sessionsSig(sessions);
+  const timeStale = Date.now() - lastRender > 60000;   // keep relative times/ACTIVE badges fresh
+  if (sig !== lastSig || (timeStale && !listHover)) { lastSig = sig; render(); }
+}
+document.getElementById('search').addEventListener('input', render);
+window.addEventListener('hashchange', () => { document.getElementById('search').value = ''; render(); });
+const listEl = document.getElementById('list');
+listEl.addEventListener('pointerenter', () => listHover = true);
+listEl.addEventListener('pointerleave', () => listHover = false);
+tick();
+setInterval(tick, 2500);
+</script>
+</body>
+</html>

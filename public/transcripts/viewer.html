@@ -1,0 +1,2145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Session Viewer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23161b22'/%3E%3Ctext x='8' y='12' font-size='10' text-anchor='middle' fill='%2358a6ff' font-family='monospace'%3E%7B%7D%3C/text%3E%3C/svg%3E">
+<style>
+/*BASE*/
+  .wrap header { border-bottom: 1px solid var(--border); padding-bottom: 18px; margin-bottom: 22px; }
+  .topnav { display: flex; align-items: center; gap: 14px; font-size: 13px; flex: 1; min-width: 0; }
+  .navbtn { display: inline-flex; align-items: center; gap: 5px; background: none; border: none;
+            color: var(--accent); font: inherit; font-size: 13px; cursor: pointer; padding: 0; }
+  .navbtn:hover { text-decoration: underline; }
+  .navbtn:disabled { color: var(--faint); cursor: default; text-decoration: none; }
+  #live-status { margin-left: auto; color: var(--dim); font-size: 12.5px; }
+  .wrap header h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .session-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--dim); font-size: 12.5px;
+                  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .session-meta b { color: var(--text); font-weight: 500; }
+  .ic { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2;
+        stroke-linecap: round; stroke-linejoin: round; vertical-align: -2px; }
+  #overview { margin-bottom: 22px; display: flex; flex-direction: column; gap: 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+  .kpi .v { font-size: 20px; font-weight: 650; letter-spacing: -0.3px; }
+  .kpi .v small { font-size: 12px; color: var(--dim); font-weight: 400; }
+  .kpi .l { font-size: 10.5px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.6px; margin-top: 1px; }
+  .kpi .s { font-size: 11px; color: var(--faint); margin-top: 3px; font-family: ui-monospace, Menlo, monospace;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ovrow { display: flex; gap: 10px; align-items: stretch; }
+  .ovcol-main { flex: 2 1 0; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .ovcol-side { flex: 1 1 0; min-width: 0; display: flex; }
+  .ovcol-side .ovturns { flex: 1; display: flex; flex-direction: column; }
+  .ovturns #chart-turns { flex: 1; overflow-y: auto; max-height: 168px; }
+  .ovturns .hbar-row { gap: 7px; margin: 4px 0; }
+  .ovturns .tnum { flex-shrink: 0; width: 22px; text-align: right; color: var(--faint);
+                   font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; }
+  @media (max-width: 760px) { .ovrow { flex-direction: column; } }
+  .ovbar { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+  .ovbar-head { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--dim);
+                text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px; }
+  .ovbar-track { display: flex; height: 18px; border-radius: 5px; overflow: hidden; background: var(--panel2); }
+  .ovbar-track > span { display: block; height: 100%; min-width: 1px; }
+  .ovbar-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 7px; font-size: 11.5px;
+                  color: var(--dim); font-family: ui-monospace, Menlo, monospace; }
+  .ovbar-legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+  .ovbar-legend b { color: var(--text); font-weight: 600; }
+  .metastrip { display: flex; flex-wrap: wrap; gap: 6px; }
+  .recwrap { display: grid; grid-template-columns: minmax(0, 1fr) 232px; gap: 14px; align-items: start; }
+  #toc { position: sticky; top: 64px; max-height: calc(100vh - 84px); overflow-y: auto;
+         border: 1px solid var(--border); border-radius: 8px; background: var(--panel); padding: 6px; }
+  .toc-head { font-size: 10.5px; font-weight: 700; color: var(--dim); text-transform: uppercase;
+              letter-spacing: 0.6px; padding: 5px 7px 4px; }
+  .toc-item { display: flex; gap: 7px; align-items: baseline; padding: 4px 7px; border-radius: 5px;
+              cursor: pointer; font-size: 11.5px; color: var(--dim); }
+  .toc-item:hover { background: var(--panel2); color: var(--text); }
+  .toc-item.cur { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
+  .toc-n { font-family: ui-monospace, Menlo, monospace; color: var(--accent); font-size: 10px;
+           min-width: 17px; text-align: right; flex-shrink: 0; }
+  .toc-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toc-c { font-family: ui-monospace, Menlo, monospace; font-size: 10px; color: var(--faint); flex-shrink: 0; }
+  #turnjump { display: none; background: var(--panel); border: 1px solid var(--border); color: var(--dim);
+              border-radius: 6px; padding: 5px 8px; font-size: 12px; max-width: 200px; outline: none; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { background: var(--panel); border: none; color: var(--dim); font: inherit; font-size: 12px;
+                padding: 4px 11px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button.on { background: color-mix(in srgb, var(--branch) 20%, var(--panel)); color: var(--text); }
+  /* per-turn markers — clickable buttons that jump to that turn's branch / compaction point */
+  .toc-tick { flex-shrink: 0; font-size: 11px; cursor: pointer; border-radius: 4px; padding: 0 3px;
+              border: 1px solid transparent; line-height: 1.4; }
+  .toc-fork { color: var(--branch); }
+  .toc-fork:hover { background: color-mix(in srgb, var(--branch) 20%, transparent);
+                    border-color: color-mix(in srgb, var(--branch) 55%, transparent); }
+  .toc-compact { color: var(--compact); }
+  .toc-compact:hover { background: color-mix(in srgb, var(--compact) 20%, transparent);
+                       border-color: color-mix(in srgb, var(--compact) 55%, transparent); }
+  .toc-err { color: var(--warning); }
+  .toc-err:hover { background: color-mix(in srgb, var(--warning) 20%, transparent);
+                   border-color: color-mix(in srgb, var(--warning) 55%, transparent); }
+  /* branch switcher — sits on the versioned message */
+  .branchbar { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 46px;
+               border-top: 1px solid color-mix(in srgb, var(--branch) 35%, var(--border));
+               background: color-mix(in srgb, var(--branch) 8%, transparent);
+               color: var(--branch); font-family: ui-monospace, Menlo, monospace; font-size: 11px; outline: none; }
+  .branchbar:focus { box-shadow: inset 2px 0 0 var(--branch); }
+  .branchbar .ic { stroke: var(--branch); flex-shrink: 0; }
+  .brlabel { text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; font-size: 10px; }
+  .brbtn { background: none; border: 1px solid color-mix(in srgb, var(--branch) 45%, transparent);
+           color: var(--branch); border-radius: 4px; width: 18px; height: 18px; line-height: 1; cursor: pointer;
+           font-size: 13px; padding: 0; display: flex; align-items: center; justify-content: center; }
+  .brbtn:hover:not(:disabled) { background: color-mix(in srgb, var(--branch) 22%, transparent); }
+  .brbtn:disabled { opacity: 0.35; cursor: default; }
+  .brcount b { color: var(--text); }
+  .brtag { font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+           padding: 1px 7px; border-radius: 4px; background: var(--branch); color: var(--bg); }
+  @media (max-width: 920px) {
+    .recwrap { grid-template-columns: 1fr; }
+    #toc { display: none; }
+    #turnjump { display: block; }
+  }
+  #chart-types, #chart-tools, #chart-turns { max-height: 300px; overflow-y: auto; }
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px; }
+  .chart { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow: hidden; }
+  .chart.full { grid-column: 1 / -1; }
+  .chart h3 { font-size: 13px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 10px; }
+  /* Chart canvas SVGs only — :not(.ic2) excludes inline mini icons (otherwise the ×N error marker in hbar-val gets stretched into a full-row block and wraps) */
+  .chart svg:not(.ic2) { display: block; width: 100%; height: auto; }
+  .hbar-row { display: flex; align-items: center; gap: 10px; margin: 5px 0; font-size: 12.5px; }
+  .hbar-label { width: 165px; flex-shrink: 0; text-align: right; color: var(--dim); font-family: ui-monospace, Menlo, monospace;
+                font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hbar-track { flex: 1; background: var(--panel2); border-radius: 4px; height: 16px; position: relative; }
+  .hbar-track.tall { height: 18px; }
+  .hbar-fill { height: 100%; border-radius: 4px; min-width: 2px; }
+  .bar-text { position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+              font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; color: var(--text);
+              text-shadow: 0 1px 2px var(--bar-shadow); white-space: nowrap; pointer-events: none; }
+  .hbar-val { width: 66px; flex-shrink: 0; font-family: ui-monospace, Menlo, monospace; font-size: 11px;
+              color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; font-size: 11.5px; color: var(--dim); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .tok-readout { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 14px; margin: 8px 0 2px;
+                 font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; color: var(--dim);
+                 border-top: 1px solid var(--border); padding-top: 7px; }
+  .tok-readout b { color: var(--text); font-weight: 650; }
+  .tok-readout .tsep { color: var(--faint); margin-left: -3px; }
+  .tok-readout .tmodel { color: var(--accent); }
+  .tok-readout .tk { display: inline-flex; align-items: center; gap: 5px; }
+  .tok-readout .tk i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  .tok-readout .tjump { margin-left: auto; color: var(--accent); cursor: pointer;
+                        display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+  .tok-readout .tjump:hover { text-decoration: underline; }
+  #chart-tokens { outline: none; }
+  #chart-tokens:focus-visible { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 4px; }
+  .tok-pinchip { font-size: 10px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase;
+                 color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+                 border-radius: 999px; padding: 0 7px; cursor: pointer; user-select: none;
+                 background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .tok-pinchip:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px;
+             position: sticky; top: 0; z-index: 10; background: var(--bg); padding: 10px 0; border-bottom: 1px solid var(--border); }
+  #chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chip { border: 1px solid var(--border); background: var(--panel); color: var(--dim); border-radius: 999px;
+          padding: 4px 12px; font-size: 12.5px; cursor: pointer; user-select: none; transition: all .12s; }
+  .chip .n { opacity: 0.65; font-size: 11px; margin-left: 4px; }
+  .chip.on { color: var(--text); border-color: var(--chipc, var(--accent));
+             background: color-mix(in srgb, var(--chipc, var(--accent)) 14%, var(--panel)); }
+  .chip.on::before { content: "●"; color: var(--chipc, var(--accent)); margin-right: 6px; font-size: 9px; vertical-align: 1px; }
+  #search { margin-left: auto; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+            border-radius: 6px; padding: 6px 12px; font-size: 13px; width: 220px; outline: none; }
+  #search:focus { border-color: var(--accent); }
+  #count-note { font-size: 12px; color: var(--faint); }
+  .tstamp { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--faint);
+            flex-shrink: 0; font-weight: 400; letter-spacing: 0; }
+  /* --- flat record-log feed: one row per JSONL line --- */
+  #feed { border: 1px solid var(--border); border-radius: 8px; background: var(--panel); overflow: hidden; }
+  .row { border-left: 3px solid var(--rc, var(--border)); border-top: 1px solid color-mix(in srgb, var(--border) 45%, transparent); }
+  .row:first-child { border-top: none; }
+  .row > summary { display: flex; gap: 9px; align-items: baseline; padding: 3px 10px 3px 7px; cursor: pointer;
+                   list-style: none; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                   font-size: 12px; min-width: 0; line-height: 1.55; }
+  .row > summary::-webkit-details-marker { display: none; }
+  .row > summary:hover, .row[open] > summary { background: var(--panel2); }
+  .row.warnrow > summary { background: color-mix(in srgb, var(--warning) 7%, transparent); }
+  .lno { color: var(--faint); min-width: 36px; text-align: right; flex-shrink: 0; font-size: 11px; }
+  .ts { color: var(--faint); flex-shrink: 0; font-size: 11px; min-width: 92px; }
+  /* Type badges: background/text/ring all derive from the row role color --rc; intensity is controlled by the --badge-* knobs in base.css
+     (light mode = tinted background with colored text, dark mode = solid fill with inverted text) */
+  .tbadge { flex-shrink: 0; font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+            padding: 1px 7px; border-radius: 4px; min-width: 72px; max-width: 106px; text-align: center; align-self: center;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            color: color-mix(in srgb, var(--rc, var(--dim)) var(--badge-ink), var(--bg));
+            background: color-mix(in srgb, var(--rc, var(--dim)) var(--badge-tint), transparent);
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc, var(--dim)) var(--badge-ring), transparent); }
+  .sbadge { flex-shrink: 0; font-size: 10px; padding: 0 6px; border-radius: 4px; align-self: center;
+            border: 1px solid color-mix(in srgb, var(--sc, var(--dim)) 40%, transparent);
+            color: var(--sc, var(--dim));
+            background: color-mix(in srgb, var(--sc, transparent) 9%, transparent); }
+  .toolname { flex-shrink: 0; align-self: center; font-family: ui-monospace, Menlo, monospace;
+              font-size: 11.5px; font-weight: 700; color: var(--tool); padding: 0 7px; border-radius: 4px;
+              background: color-mix(in srgb, var(--tool) 13%, transparent);
+              max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fbadge { flex-shrink: 0; font-size: 10px; padding: 0 6px; border-radius: 4px; align-self: center;
+            border: 1px dashed var(--border); color: var(--faint); }
+  .fbadge.warn { border-color: var(--warning); color: var(--warning); border-style: solid; }
+  .fbadge.adv { border-color: var(--tok-advisor); color: var(--tok-advisor); border-style: solid; }
+  .fbadge.fmeta { border: none; font-weight: 700;
+                  color: color-mix(in srgb, var(--meta) var(--badge-ink), var(--bg));
+                  background: color-mix(in srgb, var(--meta) var(--badge-tint), transparent);
+                  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--meta) var(--badge-ring), transparent); }
+  .row.metarow > summary { background: repeating-linear-gradient(45deg, transparent 0 7px,
+                           color-mix(in srgb, var(--meta) 8%, transparent) 7px 14px); }
+  .row.metarow > summary:hover, .row.metarow[open] > summary {
+    background: var(--panel2); }
+  .snip { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          color: var(--faint); }
+  .row > summary:hover .snip { color: var(--dim); }
+  .rawbtn { flex-shrink: 0; width: 16px; height: 16px; padding: 0; display: flex; align-items: center;
+            justify-content: center; font-family: ui-monospace, Menlo, monospace; font-size: 7.5px;
+            color: var(--faint); border: 1px solid var(--border); border-radius: 3px;
+            cursor: pointer; align-self: center; user-select: none; }
+  .rawbtn:hover { color: var(--accent); border-color: var(--accent); }
+  .tcol-l { min-width: 56px; text-align: right; }
+  .tcol-s { min-width: 14px; text-align: center; }
+  .tcol-d { min-width: 52px; text-align: right; }
+  .tcol-hd { min-width: 52px; text-align: right; } /* hook-layer measured execution duration column (only appears when there is data) */
+  .lnk { flex-shrink: 0; color: var(--accent); font-size: 11px; cursor: pointer; }
+  .lnk:hover { text-decoration: underline; }
+  .sres { font-size: 11px; color: var(--system); flex-shrink: 0; }
+  .sres.err { color: var(--warning); }
+  .sdur { font-size: 11px; color: var(--faint); flex-shrink: 0; }
+  /* Hook-layer measured execution duration: one shade darker than sdur (record interval, incl. harness overhead/approval wait) to show hierarchy */
+  .hdur { font-size: 11px; color: var(--dim); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+  .hdur.err { color: var(--warning); font-weight: 600; }
+  .row-body { border-top: 1px dashed var(--border); background: var(--bg); padding: 12px 16px 14px 46px;
+              display: flex; flex-direction: column; gap: 10px; }
+  .env { column-width: 330px; column-gap: 30px; background: var(--panel); border: 1px solid var(--border);
+         border-radius: 6px; padding: 8px 12px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+  .env-row { display: flex; gap: 10px; break-inside: avoid; padding: 1px 0; }
+  .env-k { color: var(--faint); min-width: 122px; flex-shrink: 0; }
+  .env-v { color: var(--dim); word-break: break-all; min-width: 0; }
+  .env a { color: var(--accent); }
+  .content { font-size: 13px; }
+  .blk { border: 1px solid var(--border); border-left: 2px solid var(--bc, var(--border));
+         border-radius: 6px; overflow: hidden; }
+  .blk-h { display: flex; justify-content: space-between; gap: 12px; align-items: baseline;
+           background: var(--panel); border-bottom: 1px solid var(--border); padding: 4px 11px; }
+  .blk-t { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+           color: var(--bc, var(--dim)); white-space: nowrap; }
+  .blk-m { font-family: ui-monospace, Menlo, monospace; font-size: 11px; color: var(--faint);
+           text-align: right; word-break: break-all; min-width: 0; }
+  .blk-m b { color: var(--dim); font-weight: 600; }
+  .blk-b { padding: 9px 12px; font-size: 13px; }
+  .blk-b > pre.json:only-child { border: none; border-radius: 0; margin: -9px -12px; max-height: 380px; }
+  .row-body > .usage-pills, .row-body > details.raw { margin-top: 0; }
+  /* Turn separators are the feed's main navigation rhythm: a tinted accent background anchors the eye when scan-scrolling */
+  .turnsep { display: flex; align-items: center; gap: 10px; padding: 4px 10px;
+             background: color-mix(in srgb, var(--accent) 7%, var(--panel2));
+             border-top: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+             color: var(--accent); font-family: ui-monospace, Menlo, monospace;
+             font-size: 10px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
+  .turnsep::after { content: ""; flex: 1; border-top: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); }
+  .gap-marker { text-align: center; color: var(--faint); font-size: 11px; padding: 4px 10px;
+                display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--border);
+                font-family: ui-monospace, Menlo, monospace; }
+  .gap-marker::before, .gap-marker::after { content: ""; flex: 1; border-top: 1px dashed var(--border); }
+  .compactband { display: flex; align-items: center; gap: 12px; padding: 5px 12px;
+                 font-family: ui-monospace, Menlo, monospace; font-size: 11px; font-weight: 600;
+                 letter-spacing: 0.3px; color: var(--compact);
+                 background: color-mix(in srgb, var(--compact) 8%, transparent);
+                 border-top: 1px solid color-mix(in srgb, var(--compact) 35%, var(--border));
+                 border-bottom: 1px solid color-mix(in srgb, var(--compact) 35%, var(--border)); }
+  .compactband::before, .compactband::after { content: ""; flex: 1;
+                 border-top: 1px dashed color-mix(in srgb, var(--compact) 40%, transparent); }
+  .compactband a { color: var(--compact); text-decoration: underline; }
+  .md p { margin: 6px 0; }
+  .md blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--dim); margin: 8px 0; }
+  .md code { background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px;
+             font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  .md pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;
+            overflow-x: auto; margin: 8px 0; }
+  .md pre code { background: none; border: none; padding: 0; font-size: 12px; }
+  .md strong { font-weight: 650; }
+  .md em { font-style: italic; color: var(--dim); }
+  .kv { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--dim); }
+  .kv b { color: var(--text); font-weight: 500; }
+  pre.json { background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;
+             overflow-x: auto; font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; color: var(--code-fg);
+             margin-top: 8px; max-height: 420px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+  pre.json .jk { color: var(--json-key); }
+  pre.json .js { color: var(--json-str); }
+  pre.json .jn { color: var(--json-num); }
+  pre.json .jb { color: var(--json-kw); }
+  .blk-img { display: block; max-width: 100%; max-height: 420px; border-radius: 4px; }
+  details.raw, details.inline { border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+                                margin-top: 8px; }
+  details.raw > summary, details.inline > summary {
+    display: flex; align-items: baseline; gap: 8px; padding: 4px 11px; background: var(--panel);
+    cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase;
+    color: var(--dim); user-select: none; list-style: none; }
+  details.raw > summary::-webkit-details-marker, details.inline > summary::-webkit-details-marker { display: none; }
+  details.raw > summary::before, details.inline > summary::before {
+    content: ""; display: inline-block; width: 9px; height: 9px; flex-shrink: 0; align-self: center;
+    background: var(--faint); -webkit-mask: var(--chev) center / contain no-repeat;
+    mask: var(--chev) center / contain no-repeat; transition: transform .12s; }
+  details[open].raw > summary::before, details[open].inline > summary::before { transform: rotate(90deg); }
+  details.raw > summary:hover, details.inline > summary:hover { color: var(--accent); }
+  details[open].raw > summary, details[open].inline > summary { border-bottom: 1px solid var(--border); }
+  details.raw > pre.json, details.inline > pre.json { border: none; border-radius: 0; margin: 0; max-height: 420px; }
+  .raw-size { margin-left: auto; color: var(--faint); font-weight: 400; letter-spacing: 0;
+              text-transform: none; font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; }
+  /* compact numeric table: per-model breakdown + per-iteration inference calls */
+  table.ttab { border-collapse: collapse; font-family: ui-monospace, Menlo, monospace; font-size: 11px; width: 100%; }
+  .ttab th, .ttab td { text-align: right; padding: 2.5px 9px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+                       color: var(--dim); white-space: nowrap; }
+  .ttab th:first-child, .ttab td:first-child { text-align: left; padding-left: 2px; }
+  .ttab th:last-child, .ttab td:last-child { padding-right: 2px; }
+  .ttab th { color: var(--faint); font-weight: 600; text-transform: uppercase; font-size: 9.5px; letter-spacing: 0.5px; }
+  .ttab td:first-child { color: var(--text); }
+  .ttab tr.advrow td { color: var(--tok-advisor); }
+  .ttab tr:last-child td { border-bottom: none; }
+  #tok-models { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 4px; }
+  .usage-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pill { font-size: 10.5px; font-family: ui-monospace, Menlo, monospace; background: var(--panel2);
+          border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; color: var(--dim); }
+  .pill b { color: var(--text); font-weight: 600; }
+  .warn-box { background: color-mix(in srgb, var(--warning) 9%, transparent);
+              border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+              border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+  .thinking-text { color: var(--dim); font-style: italic; font-size: 13px; white-space: pre-wrap; }
+  .hidden { display: none !important; }
+  .empty-note { color: var(--faint); font-style: italic; font-size: 12.5px; }
+  h2.section { font-size: 15px; font-weight: 600; margin: 26px 0 12px; color: var(--text); }
+  /* Collapsible charts section: heading styled to match h2.section; the collapse preference is persisted */
+  .sect-sum { font-size: 15px; font-weight: 600; margin: 26px 0 12px; color: var(--text);
+              cursor: pointer; user-select: none; list-style: none; }
+  .sect-sum::-webkit-details-marker { display: none; }
+  .sect-sum::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 7px;
+    background: var(--faint); -webkit-mask: var(--chev) center / contain no-repeat;
+    mask: var(--chev) center / contain no-repeat; transition: transform .12s; transform: rotate(90deg); }
+  details:not([open]) > .sect-sum::before { transform: rotate(0deg); }
+  .sect-sum .sum-hint { font-weight: 400; color: var(--faint); font-size: 12px; margin-left: 4px;
+                        opacity: 0; transition: opacity .12s; }
+  details:not([open]) > .sect-sum .sum-hint, .sect-sum:hover .sum-hint { opacity: 1; }
+  svg text { font-family: ui-monospace, Menlo, monospace; }
+  svg .axis { fill: var(--faint); font-size: 10px; }
+  svg .gridline { stroke: var(--border); stroke-width: 0.5; stroke-dasharray: 2 3; }
+  svg .limit-line { stroke: var(--warning); stroke-width: 1; stroke-dasharray: 5 4; opacity: .5; }
+  svg .limit-label { fill: var(--warning); opacity: .8; font-size: 10px; }
+  .chart h3 .h3-sub { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--faint); margin-left: 8px; }
+.msg-target > summary { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px;
+  transition: outline-color 1.2s ease 1s; }
+a.fbadge.apilink { text-decoration: none; cursor: pointer; }
+a.fbadge.apilink:hover { background: color-mix(in srgb, var(--dim) 16%, transparent); }
+</style>
+</head>
+<body>
+<!--EMBED-->
+<header class="topbar">
+  <span class="live-dot" id="dot" title="Live polling status"></span>
+  <h1 class="brand" title="Claude Code dashboard">cclens</h1>
+  <nav class="view-switch" id="view-switch" title="Two observation layers: API = proxy layer · Transcript = session semantic layer">
+    <a href="/" id="vs-api">API</a>
+    <a class="active" href="/transcripts" title="back to the transcript index">Transcript</a>
+  </nav>
+  <div class="topnav">
+      <a id="up-link" href="#" style="display:none" title="this is a subagent transcript — open the session that spawned it"><svg class="ic" viewBox="0 0 24 24"><polyline points="14 9 9 4 4 9"/><path d="M20 20h-7a4 4 0 0 1-4-4V4"/></svg> parent session</a>
+      <button id="open-btn" class="navbtn" style="display:none" title="open the .jsonl file in your default app"><svg class="ic" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> open .jsonl</button>
+      <button id="reveal-btn" class="navbtn" style="display:none" title="show the file in Finder / file manager"><svg class="ic" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> reveal</button>
+      <a id="export-btn" href="#" style="display:none"><svg class="ic" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> export standalone HTML</a>
+      <span id="live-status"><span id="status-text">loading…</span></span>
+  </div>
+</header>
+<div class="wrap">
+  <header>
+    <h1 id="title">Session</h1>
+    <div class="session-meta" id="session-meta"></div>
+  </header>
+
+  <div id="overview"></div>
+
+  <details id="charts-sec" open ontoggle="chartsToggle(this)">
+  <summary class="sect-sum">Charts <span class="sum-hint">record types · tool calls · activity timeline · token usage</span></summary>
+  <div class="charts">
+    <div class="chart"><h3>Record Types</h3><div id="chart-types"></div></div>
+    <div class="chart"><h3>Tool Calls</h3><div id="chart-tools"></div></div>
+    <div class="chart full"><h3>Activity Timeline</h3><div id="chart-timeline"></div></div>
+    <div class="chart full"><h3>Token Usage per API Message <span class="h3-sub">how much of each call is repeated prefix vs. new content</span></h3>
+      <div class="legend">
+        <span title="repeated prefix replayed from cache — the bulk of every call's input"><i style="background:var(--tok-read)"></i>cache read (repeated prefix)</span>
+        <span title="newly cached this call"><i style="background:var(--tok-write)"></i>cache write (newly cached)</span>
+        <span><i style="background:var(--tok-input)"></i>input (fresh)</span>
+        <span><i style="background:var(--tok-output)"></i>output</span>
+        <span id="leg-advisor" style="display:none" title="tokens burned by hidden advisor inference calls — NOT included in the message's usage totals"><i style="background:var(--tok-advisor)"></i>advisor (hidden)</span>
+        <span id="tok-hint" style="margin-left:auto;color:var(--faint)" title="hover inspects any bar (tooltip) and scrubs the readout · click pins the focus · drag zooms into a range (a minimap appears for orientation; click it to pan, drag it to reselect) · double-click jumps to the record · ←/→ step through messages · Esc zooms back out, then releases the pin">hover inspect · click pin · drag zoom · dblclick jump · Esc back · ←→</span>
+      </div>
+      <div id="chart-tokens" tabindex="0" onkeydown="tokKey(event)"></div>
+      <div id="tok-models" style="display:none"></div>
+    </div>
+  </div>
+  </details>
+
+  <h2 class="section">Records <span style="font-weight:400;color:var(--faint);font-size:12px">one row per JSONL line, in file order</span></h2>
+  <div class="toolbar" id="toolbar">
+    <span id="chips"></span>
+    <span id="viewtoggle" class="seg" style="display:none" title="Thread reconstructs the conversation tree from parentUuid and collapses abandoned branches. Raw shows every record in literal file order.">
+      <button data-m="thread" class="on">Thread</button><button data-m="raw">Raw</button>
+    </span>
+    <select id="turnjump"><option value="">jump to turn…</option></select>
+    <input id="search" type="search" placeholder="Search records…">
+    <span id="count-note"></span>
+  </div>
+  <div class="recwrap">
+    <div id="feed"></div>
+    <nav id="toc"></nav>
+  </div>
+</div>
+
+<script>
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmtNum = n => n == null ? '—' : n.toLocaleString('en-US');
+// All glyphs site-wide use inline SVG (Feather-style 24×24 stroke) — no character/emoji stand-ins
+const ICON_PATHS = {
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  dots: '<circle cx="4" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/><circle cx="20" cy="12" r="2.2" fill="currentColor" stroke="none"/>',
+  branch: '<line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+  compact: '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/>',
+  xcircle: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>',
+  repeat: '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  chevl: '<polyline points="15 18 9 12 15 6"/>',
+  chevr: '<polyline points="9 18 15 12 9 6"/>',
+  arrowl: '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+  arrowr: '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>',
+  extlink: '<line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/>',
+  cornerdr: '<polyline points="15 10 20 15 15 20"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>',
+  par: '<line x1="9" y1="4" x2="9" y2="20"/><line x1="15" y1="4" x2="15" y2="20"/>',
+  code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+};
+const icon = (name, px = 12) => `<svg class="ic2" style="width:${px}px;height:${px}px" viewBox="0 0 24 24">${ICON_PATHS[name]}</svg>`;
+const fmtTok = n => n >= 1e6 ? (n/1e6).toFixed(1).replace(/\.0$/,'') + 'M'
+                  : n >= 1000 ? (n/1000).toFixed(1).replace(/\.0$/,'') + 'k' : String(n);
+const fmtTime = ts => ts ? new Date(ts).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
+const fmtTimeMs = ts => {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleTimeString('en-GB', {hour12:false}) + '.' + String(d.getMilliseconds()).padStart(3, '0');
+};
+const fmtDateTime = ts => ts ? new Date(ts).toLocaleString('en-GB', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '';
+const fmtDur = ms => {
+  if (ms == null) return '—';
+  if (ms < 1000) return ms + 'ms';
+  if (ms < 60000) return (ms/1000).toFixed(1) + 's';
+  if (ms < 3600000) return Math.floor(ms/60000) + 'm ' + Math.round((ms%60000)/1000) + 's';
+  return Math.floor(ms/3600000) + 'h ' + Math.round((ms%3600000)/60000) + 'm';
+};
+
+// JSON syntax highlighting: a single-pass token scan (key/string/number/keyword) over JSON.stringify output;
+// the rest (punctuation/whitespace) keeps the base color. Only used for content known to be JSON — plain text (tool output etc.) is left as-is, no guessing.
+const JSON_TOK = /("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g;
+function hiJson(src) {
+  if (src.length > 300000) return esc(src);   // don't generate hundreds of thousands of spans for a huge payload
+  let out = '', last = 0, m;
+  JSON_TOK.lastIndex = 0;
+  while ((m = JSON_TOK.exec(src))) {
+    out += esc(src.slice(last, m.index));
+    if (m[1] !== undefined)
+      out += m[2] !== undefined ? `<span class="jk">${esc(m[1])}</span>${esc(m[2])}`
+                                : `<span class="js">${esc(m[1])}</span>`;
+    else if (m[3] !== undefined) out += `<span class="jb">${esc(m[0])}</span>`;
+    else out += `<span class="jn">${esc(m[0])}</span>`;
+    last = m.index + m[0].length;
+  }
+  return out + esc(src.slice(last));
+}
+const jpre = obj => `<pre class="json">${hiJson(JSON.stringify(obj, null, 2))}</pre>`;
+
+function md(text) {
+  let t = esc(text);
+  t = t.replace(/```([\w-]*)\n([\s\S]*?)```/g, (_, lang, code) => `<pre><code>${code}</code></pre>`);
+  t = t.replace(/(^|\n)((?:&gt;.*(?:\n|$))+)/g, (_, pre, block) => {
+    const inner = block.split('\n').map(l => l.replace(/^&gt;\s?/, '')).join('\n').trim();
+    return pre + '<blockquote>' + inner + '</blockquote>\n';
+  });
+  t = t.replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?]|$)/g, '$1<em>$2</em>');
+  return t.split(/\n{2,}/).map(p =>
+    /^<(pre|blockquote)/.test(p.trim()) ? p : '<p>' + p.replace(/\n/g, '<br>') + '</p>'
+  ).join('');
+}
+
+// ---------- state ----------
+const params = new URLSearchParams(location.search);
+const P = params.get('path');
+const records = [];
+const resultByToolId = {}, useByToolId = {}, byUuid = {}, parBatch = {}, msgFirst = {};
+let apiSid = null; // session id when the API dashboard has captured this session (for cross-layer deep links)
+
+// Hook event-layer annotations (/__hooks/annotations): tool_use_id is globally unique, so this applies uniformly to main-chain and subagent transcripts.
+// tuid → { tool, durMs (measured PreToolUse→PostToolUse execution), waitMs (approval wait), fail, open }
+// The transcript's own record interval (the sdur column) includes harness overhead and approval waits; the hook layer is net execution wall clock — the two corroborate each other.
+let hookMap = null;
+let hookAny = false; // render the column only when a tool_use in this transcript matches hook data (zero footprint when there is none)
+let hookSig = '';    // signature of the entries relevant to this transcript — re-render only on real change
+let hookAt = 0;      // fetch throttle (5s)
+
+function refreshHooks(force) {
+  const now = Date.now();
+  if (!force && now - hookAt < 5000) return;
+  hookAt = now;
+  fetch('/__hooks/annotations').then(r => r.ok ? r.json() : null).then(d => {
+    if (!d || !d.tuids) return;
+    hookMap = d.tuids;
+    let sig = '';
+    for (const id in useByToolId) {
+      const h = hookMap[id];
+      if (h) sig += id + ':' + (h.durMs ?? '') + ':' + (h.waitMs ?? '') + (h.fail ? 'F' : '') + ';';
+    }
+    hookAny = sig !== '';
+    if (sig !== hookSig) { hookSig = sig; renderFeed(); }
+  }).catch(() => {}); // older servers / exported snapshots lack this endpoint — degrade silently
+}
+let byteOffset = 0;
+let serverMeta = null;   // /api/meta sidecar info (subagent meta.json etc.)
+const GAP_MS = 10 * 60 * 1000;
+
+// ---------- hidden inference mechanics ----------
+// usage.iterations lists the REAL API calls behind one logical assistant message.
+// Entries typed "advisor_message" are extra inference (often a big fresh-input call by
+// another model) whose tokens are NOT included in the message's headline usage totals.
+const iterationsOf = r => Array.isArray(r?.message?.usage?.iterations) ? r.message.usage.iterations : [];
+const advisorIters = u => (Array.isArray(u?.iterations) ? u.iterations : []).filter(it => it && it.type === 'advisor_message');
+const advisorTok = u => advisorIters(u).reduce((a, it) => a + (it.input_tokens || 0) + (it.output_tokens || 0), 0);
+const ctxTok = u => (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+// user pressed Esc / typed over an in-flight request
+const isInterrupt = r => {
+  if (r.type !== 'user') return false;
+  if (r.interruptedMessageId) return true;
+  const c = r.message?.content;
+  if (typeof c === 'string') return c.startsWith('[Request interrupted');
+  if (Array.isArray(c)) return c.some(b => typeof b?.text === 'string' && b.text.startsWith('[Request interrupted'));
+  return false;
+};
+
+// ---------- conversation tree (parentUuid) ----------
+// Message records carry uuid/parentUuid; sidecar types (mode, ai-title, last-prompt,
+// snapshots, …) have none and are anchored to the preceding message. Multi-child
+// parents are usually NOT forks — see kidClasses(): parallel tool results hang off
+// their own tool_use record, block splits share message.id, attachments annotate.
+// A real fork = a parent with >1 alternative-timeline child (edit / rewind).
+// Missing-parent records are roots (sequential compaction segments).
+let viewMode = 'thread';           // 'thread' (tree, branches collapsed) | 'raw' (file order)
+const childOf = {};                // parentUuid -> [record index] in file order
+const sidecarOf = {};              // anchor record index -> [sidecar record indices]
+let preambleSide = [];             // sidecar indices before the first message record
+let activeSet = new Set();         // uuids on the path to the last message record
+const branchSel = {};             // fork parentUuid -> chosen child uuid (user override)
+let forkCount = 0;
+
+// effective parent: a compact_boundary has parentUuid:null but logicalParentUuid pointing back to
+// the last pre-compaction record — using it reconnects the two halves into one continuous thread.
+const parentOf = r => r.parentUuid != null ? r.parentUuid
+                    : (r.logicalParentUuid != null ? r.logicalParentUuid : null);
+
+function buildThread() {
+  for (const k in childOf) delete childOf[k];
+  for (const k in sidecarOf) delete sidecarOf[k];
+  preambleSide = [];
+  let lastMsg = -1;
+  records.forEach((r, i) => {
+    if (r.uuid) {
+      if (r._dup != null) return;   // re-emitted copy: not a node, shown only in raw view
+      const pp = parentOf(r);
+      const key = pp == null ? '∅' : pp;
+      (childOf[key] = childOf[key] || []).push(i);
+      lastMsg = i;
+    } else {
+      if (lastMsg < 0) preambleSide.push(i);
+      else (sidecarOf[lastMsg] = sidecarOf[lastMsg] || []).push(i);
+    }
+  });
+  // active path: walk the effective parent up from the last message record (spans compaction)
+  activeSet = new Set();
+  let li = records.length - 1;
+  while (li >= 0 && (!records[li].uuid || records[li]._dup != null)) li--;
+  let cur = li >= 0 ? records[li] : null;
+  while (cur) {
+    activeSet.add(cur.uuid);
+    const pp = parentOf(cur);
+    const pi = pp != null ? byUuid[pp] : undefined;
+    cur = pi != null ? records[pi] : null;
+  }
+  // count real forks: parents with >1 alternative-timeline child
+  forkCount = 0;
+  for (const key in childOf) {
+    if (key !== '∅' && byUuid[key] != null && kidClasses(byUuid[key], childOf[key]).cand.length > 1) forkCount++;
+  }
+}
+
+// Multiple children rarely mean a fork. In real transcripts most fan-out is linear flow:
+//  - a tool_result's parentUuid points at the tool_use record it answers, so in a parallel
+//    batch every result hangs off its own call while the spine runs through the calls;
+//  - one API message split into several records (same message.id) chains block-by-block;
+//  - attachment records annotate their parent alongside the real continuation.
+// Only what's left ("cand") are alternative timelines: rewind / edit / regenerate.
+function kidClasses(pIdx, kids) {
+  const pr = records[pIdx];
+  const pc = Array.isArray(pr?.message?.content) ? pr.message.content : [];
+  const ptools = new Set(pc.filter(b => b && (b.type === 'tool_use' || b.type === 'server_tool_use')).map(b => b.id));
+  const pmsg = pr?.message?.id;
+  const cand = [], flow = [];
+  kids.forEach(k => {
+    const r = records[k];
+    const c = Array.isArray(r.message?.content) ? r.message.content : [];
+    const tids = c.filter(b => b && b.tool_use_id != null).map(b => b.tool_use_id);
+    const isResult = tids.length > 0 && tids.every(id => ptools.has(id));
+    const sameMsg = r.type === 'assistant' && pmsg && r.message?.id === pmsg;
+    (isResult || sameMsg || r.type === 'attachment' ? flow : cand).push(k);
+  });
+  return { cand, flow };
+}
+// the switchable siblings at a fork parent (empty/singleton when it's not a real fork)
+function forkKidsOf(parentUuid) {
+  const pi = byUuid[parentUuid];
+  const kids = childOf[parentUuid] || [];
+  return pi != null ? kidClasses(pi, kids).cand : kids;
+}
+
+// default selected child at a fork: the one on the active path, else newest (last)
+function defaultChild(kids) {
+  const act = kids.find(k => activeSet.has(records[k].uuid));
+  return act != null ? act : kids[kids.length - 1];
+}
+function selectedChild(parentUuid, kids) {
+  const sel = branchSel[parentUuid];   // a record index; uuids can duplicate, indices can't
+  if (sel != null && kids.includes(sel)) return sel;
+  return defaultChild(kids);
+}
+
+// render sequence for thread view: [{idx, fork?}]. Collect the visible set (spine +
+// parallel-result twigs + block splits + attachments, following the selected child at
+// each real fork), then emit in FILE ORDER — a child is always appended after its
+// parent, so file order is the true interleaving (parallel results land where they
+// actually returned) and it needs no per-shape ordering logic.
+function threadOrder() {
+  const inc = new Set(), forks = {}, stack = [];
+  const push = i => { if (!inc.has(i)) { inc.add(i); stack.push(i); } };
+  // roots = message records whose effective parent is absent (null or off-file)
+  records.forEach(r => {
+    if (!r.uuid || r._dup != null) return;
+    const pp = parentOf(r);
+    if (pp == null || byUuid[pp] == null) push(r._i);
+  });
+  while (stack.length) {
+    const idx = stack.pop();
+    const kids = childOf[records[idx].uuid] || [];
+    if (!kids.length) continue;
+    const { cand, flow } = kidClasses(idx, kids);
+    flow.forEach(push);                       // linear flow: always visible
+    if (cand.length === 1) push(cand[0]);
+    else if (cand.length > 1) {               // real fork: one selected timeline
+      const selIdx = selectedChild(records[idx].uuid, cand);
+      forks[selIdx] = { parentUuid: records[idx].uuid, kids: cand, selIdx, pos: cand.indexOf(selIdx), n: cand.length };
+      push(selIdx);
+    }
+  }
+  const all = [...preambleSide, ...inc];
+  inc.forEach(i => (sidecarOf[i] || []).forEach(s => all.push(s)));
+  all.sort((a, b) => a - b);
+  return all.map(i => ({ idx: i, fork: forks[i] || null }));
+}
+
+// switch which branch is shown at a fork. Everything above the fork is identical across
+// siblings, so the branch row must stay visually fixed — we pin it to its exact prior
+// viewport offset (guards against the browser clamping scrollY on a shorter branch).
+function branchStep(parentUuid, delta) {
+  const kids = forkKidsOf(parentUuid);
+  if (kids.length < 2) return;
+  const cur = kids.indexOf(selectedChild(parentUuid, kids));
+  const pos = Math.max(0, Math.min(kids.length - 1, cur + delta));
+  if (pos === cur) return;
+  const sel = `.branchbar[data-parent="${cssEsc(parentUuid)}"]`;
+  const before = document.querySelector(sel)?.getBoundingClientRect().top;
+  branchSel[parentUuid] = kids[pos];
+  syncHash();
+  renderFeed();
+  applyFilters();
+  const bar = document.querySelector(sel);
+  if (bar) {
+    if (before != null) {
+      const shift = bar.getBoundingClientRect().top - before;
+      if (shift) window.scrollBy(0, shift);   // keep the branch row exactly where it was
+    }
+    bar.focus({ preventScroll: true });        // keep keyboard ←/→ alive across the re-render
+  }
+}
+
+// reveal a record that may be on a collapsed branch by selecting its ancestors' branches
+function revealRecord(i) {
+  const r = records[i];
+  if (!r || !r.uuid) return false;
+  let changed = false, cur = r;
+  while (cur && parentOf(cur) != null) {
+    const pp = parentOf(cur);
+    const pi = byUuid[pp];
+    if (pi == null) break;
+    const kids = forkKidsOf(pp);
+    if (kids.length > 1 && kids.includes(cur._i) && selectedChild(pp, kids) !== cur._i) {
+      branchSel[pp] = cur._i;
+      changed = true;
+    }
+    cur = records[pi];
+  }
+  if (changed) { syncHash(); renderFeed(); applyFilters(); }
+  return changed;
+}
+
+const cssEsc = s => String(s).replace(/["\\]/g, '\\$&');
+function branchKey(ev, parentUuid) {
+  if (ev.key === 'ArrowLeft') { ev.preventDefault(); branchStep(parentUuid, -1); }
+  else if (ev.key === 'ArrowRight') { ev.preventDefault(); branchStep(parentUuid, 1); }
+}
+
+// deep-link selected branches via the URL hash (#b=parentUuid:pos,…)
+function syncHash() {
+  const parts = [];
+  for (const pu in branchSel) {
+    const kids = forkKidsOf(pu);
+    if (kids.length < 2) continue;
+    const pos = kids.indexOf(branchSel[pu]);
+    if (pos >= 0 && kids[pos] !== defaultChild(kids)) parts.push(pu + ':' + pos);
+  }
+  try { history.replaceState(null, '', parts.length ? '#b=' + parts.join(',') : location.pathname + location.search); } catch (e) {}
+}
+function applyHash() {
+  const m = /[#&]b=([^&]+)/.exec(location.hash);
+  if (!m) return;
+  decodeURIComponent(m[1]).split(',').forEach(tok => {
+    const [pu, pos] = tok.split(':');
+    const kids = forkKidsOf(pu);
+    if (+pos >= 0 && +pos < kids.length) branchSel[pu] = kids[+pos];
+  });
+}
+
+const CATS = {
+  'user':        { label: 'User',        color: 'var(--user)',       on: true },
+  'assistant':   { label: 'Asst Text',   color: 'var(--assistant)',  on: true },
+  'thinking':    { label: 'Thinking',    color: 'var(--thinking)',   on: true },
+  'tool-use':    { label: 'Tool Use',    color: 'var(--tool)',       on: true },
+  'tool-result': { label: 'Tool Result', color: 'var(--toolresult)', on: true },
+  'system':      { label: 'System',      color: 'var(--system)',     on: true },
+  'meta':        { label: 'Other/Meta',  color: 'var(--meta)',       on: true },
+};
+const catOf = c => CATS[c] || CATS['meta'];
+const stripWrap = s => s.replace(/<\/?(?:command-[a-z-]+|local-command-[a-z-]+)>/g, '').trim();
+// Charts/bars fill with --*-fill (midtones in light mode; foreground colors are too heavy spread over large areas on white);
+// chips, text, and row color strips keep using foreground colors to guarantee contrast
+const LANE_COLORS = {'user':'var(--user-fill)','assistant':'var(--assistant-fill)','thinking':'var(--thinking-fill)','tool-use':'var(--tool-fill)',
+                     'tool-result':'var(--toolresult-fill)','system':'var(--system-fill)','meta':'var(--meta-fill)'};
+
+function categorize(r) {
+  if (r.type === 'assistant') {
+    const bt = (Array.isArray(r.message?.content) ? r.message.content : [])[0]?.type;
+    if (bt === 'tool_use' || bt === 'server_tool_use') return 'tool-use';
+    if (bt === 'thinking') return 'thinking';
+    return 'assistant';
+  }
+  if (r.type === 'user') {
+    const c = r.message?.content;
+    if (Array.isArray(c) && c.some(b => b.type === 'tool_result')) return 'tool-result';
+    if (r.isMeta) return 'meta';
+    return 'user';
+  }
+  if (r.type === 'system') return 'system';
+  return 'meta';
+}
+function stripPrivate(r) { const o = {...r}; delete o._i; delete o._cat; return o; }
+
+// sidecar / system records have a semantic one-liner (summarize) that beats raw JSON in the feed;
+// message records and unknown types keep the generic JSON preview so nothing is ever hidden
+const SEMANTIC_SNIP = new Set(['system', 'mode', 'permission-mode', 'ai-title', 'custom-title',
+  'agent-name', 'agent-setting', 'started', 'result', 'relocated', 'worktree-state', 'pr-link',
+  'last-prompt', 'queue-operation', 'file-history-snapshot', 'attachment']);
+function snipText(r) {
+  if (SEMANTIC_SNIP.has(r.type)) {
+    const s = summarize(r);
+    if (s && s !== r.type) return s;
+  }
+  return preview(r);
+}
+
+// generic one-line row preview: compact JSON of the payload, minus fields already shown
+// as badges/timestamps. No per-type customisation, so unknown future types render the same way.
+const PREVIEW_SKIP = ['type','subtype','uuid','parentUuid','timestamp','sessionId','version','cwd',
+                      'gitBranch','userType','entrypoint','isMeta','isSidechain','isCompactSummary',
+                      'requestId','level','promptId','messageId'];
+// replacer caps long strings so a 500 KB tool output isn't fully serialised just to show 200 chars
+const previewCap = (k, v) => (typeof v === 'string' && v.length > 220) ? v.slice(0, 220) + '…' : v;
+function preview(r) {
+  const o = stripPrivate(r);
+  PREVIEW_SKIP.forEach(k => delete o[k]);
+  if (o.message) o.message = o.message.content;  // the payload; ids/model/usage live in the body & raw JSON
+  let s = '';
+  try { s = JSON.stringify(o, previewCap); } catch (e) { s = ''; }
+  return s === '{}' ? '' : (s || '').slice(0, 200);
+}
+
+// expansion state survives live re-renders: every <details> carries a stable key
+const openSet = new Set();
+function remOpen(el) {
+  const k = el.dataset.k;
+  if (!k) return;
+  if (el.open) openSet.add(k); else openSet.delete(k);
+}
+// rows render with an empty body and build it on first open — keeps the collapsed DOM ~10x smaller
+function fillBody(row) {
+  const body = row.querySelector(':scope > .row-body');
+  if (body && body.dataset.lazy) {
+    body.innerHTML = bodyHTML(records[+row.dataset.i]);
+    delete body.dataset.lazy;
+  }
+}
+function onRowToggle(el) {
+  remOpen(el);
+  if (el.open) fillBody(el);
+}
+function rawDetails(r, label) {
+  const k = r._i + ':raw';
+  const json = JSON.stringify(stripPrivate(r), null, 2);
+  const size = json.length >= 1024 ? (json.length / 1024).toFixed(1) + ' KB' : json.length + ' B';
+  return `<details class="raw" data-k="${k}" ontoggle="remOpen(this)" ${openSet.has(k)?'open':''}><summary>${label || 'raw JSON'}<span class="raw-size">${size}</span></summary><pre class="json">${hiJson(json)}</pre></details>`;
+}
+
+// ---------- summaries & bodies ----------
+function summarize(r) {
+  const c = r.message?.content;
+  switch (r._cat) {
+    case 'user': {
+      const text = typeof c === 'string' ? c : (c || []).filter(b=>b.type==='text').map(b=>b.text).join(' ');
+      const cmd = /<command-name>([^<]+)<\/command-name>/.exec(text);
+      return cmd ? `command: ${cmd[1]}` : text.replace(/\s+/g,' ').slice(0, 130);
+    }
+    case 'assistant': {
+      const b = (c||[])[0] || {};
+      if (b.type === 'text') return (b.text||'').replace(/\s+/g,' ').slice(0, 130);
+      if (b.type === 'fallback') return `model fallback: ${b.from?.model} → ${b.to?.model}`;
+      return b.type;
+    }
+    case 'thinking': {
+      const t = (c||[])[0]?.thinking || '';
+      return t ? t.replace(/\s+/g,' ').slice(0,130) : '(redacted/empty thinking block)';
+    }
+    case 'tool-use': {
+      const b = (c||[]).find(b=>b.type==='tool_use') || {};
+      return `${b.name}(${JSON.stringify(b.input||{}).slice(0,110)})`;
+    }
+    case 'tool-result': {
+      const b = (c||[]).find(b=>b.type==='tool_result') || {};
+      const inner = typeof b.content === 'string' ? b.content : JSON.stringify(b.content);
+      return (b.is_error ? 'error · ' : '') + String(inner||'').replace(/\s+/g,' ').slice(0,120);
+    }
+    case 'system':
+      if (r.subtype === 'turn_duration') return `turn took ${fmtDur(r.durationMs)} · ${r.messageCount} messages`;
+      if (r.subtype === 'stop_hook_summary') return (r.hookInfos||[]).map(h=>h.command).join('; ') || 'stop hook';
+      if (r.subtype === 'api_error') {
+        const e = r.error || {}, msg = e.formatted || e.message || '';
+        return (`API error · attempt ${r.retryAttempt}/${r.maxRetries} · retry in ${fmtDur(Math.round(r.retryInMs||0))}` + (msg ? ` — ${msg}` : '')).slice(0, 160);
+      }
+      if (r.subtype === 'model_refusal_fallback')
+        return `refusal fallback (${r.direction||''}): ${r.originalModel||'?'} → ${r.fallbackModel||'?'}${r.apiRefusalCategory ? ' · ' + r.apiRefusalCategory : ''}`;
+      return stripWrap(String(r.content||'')).replace(/\s+/g,' ').slice(0,130) || r.subtype;
+    default: {
+      if (r.type === 'mode') return `permission mode: ${r.mode}`;
+      if (r.type === 'permission-mode') return `permission mode: ${r.permissionMode}`;
+      if (r.type === 'ai-title') return `title set: “${r.aiTitle}”`;
+      if (r.type === 'custom-title') return `custom title: “${r.customTitle}”`;
+      if (r.type === 'agent-name') return `agent name: “${r.agentName}”`;
+      if (r.type === 'agent-setting') return `agent setting: ${JSON.stringify(r.agentSetting).slice(0, 110)}`;
+      if (r.type === 'started') return `background task started · ${r.key || r.agentId || ''}`;
+      if (r.type === 'result') return `background task result · ${r.key || ''}: ${(typeof r.result === 'string' ? r.result : JSON.stringify(r.result ?? '')).replace(/\s+/g,' ').slice(0, 90)}`;
+      if (r.type === 'relocated') return `session relocated → ${r.relocatedCwd}`;
+      if (r.type === 'worktree-state') return `worktree: ${JSON.stringify(r.worktreeSession ?? null).slice(0, 110)}`;
+      if (r.type === 'pr-link') return `PR #${r.prNumber} · ${r.prRepository || r.prUrl || ''}`;
+      if (r.type === 'last-prompt') return `last prompt: ${r.lastPrompt}`;
+      if (r.type === 'queue-operation') return `${r.operation}${r.content ? ': ' + r.content : ''}`;
+      if (r.type === 'file-history-snapshot') return `file snapshot · ${Object.keys(r.snapshot?.trackedFileBackups||{}).length} tracked backups`;
+      if (r.type === 'attachment') {
+        const a = r.attachment || {};
+        if (a.addedNames) return `${a.type} · ${a.addedNames.length} tools added`;
+        if (a.type === 'goal_status') return `goal_status · met: ${a.met}`;
+        if (a.type === 'edited_text_file') return `edited_text_file · ${a.filename || ''}`;
+        if (a.type === 'queued_command') return `queued_command: ${String(a.prompt || '').replace(/\s+/g,' ').slice(0, 100)}`;
+        if (a.type === 'todo_reminder') return `todo_reminder · ${a.itemCount ?? '?'} items`;
+        if (a.type === 'plan_mode') return `plan_mode · ${a.reminderType || ''}${a.planFilePath ? ' · ' + a.planFilePath.split('/').pop() : ''}`;
+        return a.type;
+      }
+      if (r.type === 'parse-error') return 'unparseable line';
+      if (r.isMeta && c) {
+        const text = typeof c === 'string' ? c : (c||[]).filter(b=>b.type==='text').map(b=>b.text).join(' ');
+        return text.replace(/\s+/g,' ').slice(0,130);
+      }
+      return r.type;
+    }
+  }
+}
+
+// envelope: every top-level field of the record, verbatim, as a scannable key/value grid
+function envelope(r) {
+  const skip = new Set(['_i', '_cat', 'message', 'toolUseResult', 'content', 'snapshot', 'attachment', 'hookInfos', 'raw']);
+  const parts = [];
+  Object.entries(r).forEach(([k, v]) => {
+    if (skip.has(k)) return;
+    let vs = (v && typeof v === 'object') ? JSON.stringify(v) : String(v);
+    if (vs.length > 120) vs = vs.slice(0, 120) + '…';
+    let vh = esc(vs);
+    if (typeof v === 'string' && /^https?:\/\//.test(v)) vh = `<a href="${esc(v)}" target="_blank" rel="noopener">${esc(vs)}</a>`;
+    if ((k === 'parentUuid' || k === 'logicalParentUuid') && byUuid[v] != null)
+      vh = `<a href="#" onclick="event.preventDefault();jumpTo(${byUuid[v]})" title="jump to record #${byUuid[v]}">${esc(vs)}</a>`;
+    parts.push(`<div class="env-row"><span class="env-k">${esc(k)}</span><span class="env-v">${vh}</span></div>`);
+  });
+  return parts.length ? `<div class="env">${parts.join('')}</div>` : '';
+}
+
+// labeled card framing one section of the body: title strip + optional metadata + content
+const blk = (title, meta, body, color) =>
+  `<div class="blk"${color ? ` style="--bc:${color}"` : ''}><div class="blk-h"><span class="blk-t">${title}</span>${meta ? `<span class="blk-m">${meta}</span>` : ''}</div><div class="blk-b">${body}</div></div>`;
+
+// one content block, rendered in its true position within message.content
+function blockHTML(b) {
+  switch (b.type) {
+    case 'text':
+      return blk('text', '', `<div class="content md">${md(b.text || '')}</div>`);
+    case 'thinking':
+      return blk(`thinking${b.signature ? ' · signed' : ''}`, '',
+        b.thinking ? `<div class="thinking-text">${esc(b.thinking)}</div>`
+                   : `<div class="empty-note">empty thinking block (signature only)</div>`,
+        'var(--thinking)');
+    case 'redacted_thinking':
+      return blk('redacted_thinking', '', `<div class="empty-note">content encrypted by API</div>`, 'var(--thinking)');
+    case 'tool_use':
+    case 'server_tool_use': {
+      const res = resultByToolId[b.id];
+      const hk = hookMap && b.id ? hookMap[b.id] : null;
+      const meta = `<b>${esc(b.name)}</b> · id ${esc(b.id || '')}` +
+        (res ? ` · result ${icon('arrowr', 9)} <a class="lnk" onclick="jumpTo(${res._i})">#${res._i}</a>` : (b.type === 'tool_use' ? ' · no result record (yet)' : '')) +
+        (hk ? ` · hooks: ${hk.durMs != null ? `measured ${fmtDur(hk.durMs)}` : 'no PostToolUse'}` +
+          (hk.waitMs != null ? ` · approval wait ${fmtDur(hk.waitMs)}` : '') +
+          (hk.fail ? ' · <b>PostToolUseFailure</b>' : '') : '');
+      return blk(b.type, meta, jpre(b.input), 'var(--tool)');
+    }
+    case 'tool_result':
+    case 'server_tool_result':
+    case 'web_search_tool_result': {
+      const call = useByToolId[b.tool_use_id];
+      // string results are shown verbatim as plain text (no guessing whether they're JSON); structured results get JSON highlighting
+      const inner = typeof b.content === 'string' ? esc(b.content) : hiJson(JSON.stringify(b.content, null, 2));
+      const meta = `tool_use_id ${esc(b.tool_use_id || '')}` +
+        (call ? ` · call ${icon('arrowl', 9)} <a class="lnk" onclick="jumpTo(${call._i})">#${call._i}</a>` : '');
+      return blk(`${b.type}${b.is_error ? ' · is_error: true' : ''}`, meta,
+        `<pre class="json">${inner}</pre>`, b.is_error ? 'var(--warning)' : 'var(--toolresult)');
+    }
+    case 'fallback':
+      return blk('fallback', '', `<div class="warn-box">model fallback: <b>${esc(b.from?.model)}</b> → <b>${esc(b.to?.model)}</b></div>`, 'var(--warning)');
+    case 'image': {
+      const s = b.source || {};
+      const src = s.type === 'base64' && s.data ? `data:${s.media_type};base64,${s.data}`
+                : s.type === 'url' ? s.url : '';
+      return blk('image', esc([s.media_type || s.type, s.data ? fmtNum(s.data.length) + ' base64 chars' : ''].filter(Boolean).join(' · ')),
+        src ? `<img class="blk-img" src="${esc(src)}" alt="image content block">` : jpre(b));
+    }
+    default:
+      return blk(esc(b.type || '?'), '', jpre(b));
+  }
+}
+
+function bodyHTML(r) {
+  let out = envelope(r);
+  const c = r.message?.content;
+  if (typeof c === 'string') {
+    out += blk('content (string)', '', `<div class="content md">${md(c)}</div>`);
+  } else if (Array.isArray(c)) {
+    c.forEach(b => { out += blockHTML(b); });
+  }
+  // Task/subagent tool results carry run stats the raw JSON buries: surface them first
+  const tur = r.toolUseResult;
+  if (tur && typeof tur === 'object' && !Array.isArray(tur) &&
+      (tur.totalDurationMs != null || tur.totalTokens != null || tur.toolStats)) {
+    const stats = [];
+    if (tur.status) stats.push(`status <b>${esc(tur.status)}</b>`);
+    if (tur.totalDurationMs != null) stats.push(`duration <b>${fmtDur(tur.totalDurationMs)}</b>`);
+    if (tur.totalTokens != null) stats.push(`tokens <b>${fmtTok(tur.totalTokens)}</b>`);
+    if (tur.totalToolUseCount != null) stats.push(`tool calls <b>${fmtNum(tur.totalToolUseCount)}</b>`);
+    const ts = tur.toolStats && typeof tur.toolStats === 'object'
+      ? Object.entries(tur.toolStats).map(([k, v]) =>
+          `${esc(k)} ×${typeof v === 'number' ? v : esc(JSON.stringify(v).slice(0, 40))}`).join(' · ')
+      : '';
+    // subagent transcripts live at <session-stem>/subagents/agent-<agentId>.jsonl next to this file
+    let sameta = esc([tur.agentType, tur.agentId].filter(Boolean).join(' · '));
+    if (P && tur.agentId && !/\/subagents\//.test(P)) {
+      const sub = P.replace(/\.jsonl$/, '') + '/subagents/agent-' + tur.agentId + '.jsonl';
+      sameta += `${sameta ? ' · ' : ''}<a href="/transcripts/viewer?path=${encodeURIComponent(sub)}" target="_blank" rel="noopener">open transcript ${icon('extlink', 9)}</a>`;
+    }
+    out += blk('subagent run', sameta,
+      `<div class="kv">${stats.join(' · ')}${ts ? `<br>${ts}` : ''}</div>`);
+  }
+  if (r.toolUseResult !== undefined) {
+    const k = r._i + ':tur';
+    const tj = JSON.stringify(r.toolUseResult, null, 2);
+    const ts = tj.length >= 1024 ? (tj.length / 1024).toFixed(1) + ' KB' : tj.length + ' B';
+    out += `<details class="inline" data-k="${k}" ontoggle="remOpen(this)" ${openSet.has(k)?'open':''}><summary>toolUseResult (parsed by harness)<span class="raw-size">${ts}</span></summary><pre class="json">${hiJson(tj)}</pre></details>`;
+  }
+  if (r.type === 'system') {
+    if (r.subtype === 'stop_hook_summary') {
+      out += blk('hookInfos', '',
+        `<div class="kv">${(r.hookInfos||[]).map(h => `<b>${esc(h.command)}</b> · ${fmtDur(h.durationMs)}`).join('<br>')}` +
+        `${r.preventedContinuation ? '<br><span style="color:var(--warning)">preventedContinuation: true</span>' : ''}</div>`);
+    } else if (r.subtype === 'api_error') {
+      const e = r.error || {};
+      out += blk('api error · auto-retry', r.requestId ? `request ${esc(r.requestId)}` : '',
+        `<div class="warn-box">${esc(e.formatted || e.message || '(no error message)')}</div>` +
+        `<div class="kv" style="margin-top:6px">retry attempt <b>${fmtNum(r.retryAttempt)} / ${fmtNum(r.maxRetries)}</b>` +
+        ` · next retry in <b>${fmtDur(Math.round(r.retryInMs || 0))}</b>` +
+        `${e.isNetworkDown ? ' · <span style="color:var(--warning)">network down</span>' : ''}` +
+        `${e.rateLimits ? ` · rate limits <b>${esc(JSON.stringify(e.rateLimits).slice(0, 140))}</b>` : ''}</div>`,
+        'var(--warning)');
+    } else if (r.content !== undefined && r.content !== null) {
+      out += blk('content', '',
+        r.level === 'warning' ? `<div class="warn-box">${md(String(r.content))}</div>` : `<div class="content md">${md(String(r.content))}</div>`,
+        r.level === 'warning' ? 'var(--warning)' : '');
+    }
+  }
+  if (r.type === 'attachment' && r.attachment)   // present the full payload as-is; never substitute placeholder text for data
+    out += blk(`attachment · ${esc(r.attachment.type || '')}`,
+      r.attachment.addedNames ? `${r.attachment.addedNames.length} tools` : '', jpre(r.attachment));
+  if (r.type === 'file-history-snapshot')
+    out += blk('snapshot', `tracked backups <b>${Object.keys(r.snapshot?.trackedFileBackups || {}).length}</b>`,
+      jpre(r.snapshot));
+  if (r.type === 'parse-error')
+    out += blk('unparseable line', '', `<pre class="json">${esc(r.raw || '')}</pre>`, 'var(--warning)');
+  const u = r.message?.usage;
+  if (u && r.type === 'assistant') {
+    const cc = u.cache_creation || {};
+    const cwSplit = (cc.ephemeral_5m_input_tokens || cc.ephemeral_1h_input_tokens)
+      ? ` (5m ${fmtTok(cc.ephemeral_5m_input_tokens || 0)} · 1h ${fmtTok(cc.ephemeral_1h_input_tokens || 0)})` : '';
+    const advT = advisorTok(u);
+    out += `<div class="usage-pills">` +
+      `<span class="pill">msg id <b>${esc((r.message.id || '').slice(0, 20))}</b></span>` +
+      `<span class="pill">model <b>${esc(r.message.model)}</b></span>` +
+      `<span class="pill">out <b>${fmtNum(u.output_tokens)}</b></span>` +
+      `<span class="pill">in <b>${fmtNum(u.input_tokens)}</b></span>` +
+      `<span class="pill">cache r <b>${fmtNum(u.cache_read_input_tokens)}</b></span>` +
+      `<span class="pill" title="cache writes split by TTL tier: 5-minute vs 1-hour ephemeral cache">cache w <b>${fmtNum(u.cache_creation_input_tokens)}</b>${cwSplit}</span>` +
+      `<span class="pill" title="context loaded for this call: input + cache read + cache write">ctx <b>${fmtTok(ctxTok(u))}</b></span>` +
+      (advT ? `<span class="pill" style="border-color:var(--tok-advisor);color:var(--tok-advisor)" title="tokens consumed by hidden advisor calls — not included in the totals above">advisor <b>${fmtNum(advT)}</b></span>` : '') +
+      (r.message.stop_reason ? `<span class="pill">stop <b>${esc(r.message.stop_reason)}</b></span>` : '') +
+      `</div>`;
+    // the real API calls behind this one logical message (fast-mode advisor etc.)
+    const iters = iterationsOf(r);
+    if (iters.length > 1 || iters.some(it => it && it.type !== 'message')) {
+      const rows = iters.map((it, i) =>
+        `<tr${it.type === 'advisor_message' ? ' class="advrow"' : ''}><td>${i + 1} · ${esc(it.type || '?')}</td>` +
+        `<td>${esc(it.model || r.message.model || '')}</td><td>${fmtNum(it.input_tokens || 0)}</td><td>${fmtNum(it.output_tokens || 0)}</td>` +
+        `<td>${fmtNum(it.cache_read_input_tokens || 0)}</td><td>${fmtNum(it.cache_creation_input_tokens || 0)}</td></tr>`).join('');
+      out += blk('underlying inference calls', `usage totals above count only “message” rows — advisor tokens are extra`,
+        `<table class="ttab"><thead><tr><th>call</th><th>model</th><th>in</th><th>out</th><th>cache r</th><th>cache w</th></tr></thead><tbody>${rows}</tbody></table>`,
+        'var(--tok-advisor)');
+    }
+  }
+  out += rawDetails(r);
+  return out;
+}
+
+// ---------- flat record-log rendering: one row per JSONL line, in file order ----------
+function blockTypes(r) {
+  const c = r.message?.content;
+  if (typeof c === 'string') return ['string'];
+  if (Array.isArray(c)) return [...new Set(c.map(b => b.type))];
+  return [];
+}
+
+function subLabel(r) {
+  if (r.type === 'system') return r.subtype || '';
+  if (r.type === 'user' || r.type === 'assistant') return blockTypes(r).join('+');
+  if (r.type === 'attachment') return r.attachment?.type || '';
+  if (r.type === 'queue-operation') return r.operation || '';
+  if (r.type === 'mode') return r.mode || '';
+  return '';
+}
+
+// row color = who emitted the record (the JSONL `type`), one consistent dimension for the eye;
+// the full per-category palette stays in the charts where distinguishing categories matters
+const ROLE_COLORS = { user: 'var(--user)', assistant: 'var(--assistant)', system: 'var(--system)' };
+
+function openRaw(ev, i) {
+  ev.preventDefault(); ev.stopPropagation();
+  const row = document.getElementById('rec-' + i);
+  if (!row) return;
+  fillBody(row);   // body may be lazy — build it so the raw <details> exists
+  const raw = row.querySelector(`details.raw[data-k="${i}:raw"]`);
+  if (row.open && raw?.open) { raw.open = false; row.open = false; }
+  else { row.open = true; if (raw) { raw.open = true; openSet.add(i + ':raw'); } }
+}
+
+// restrained subtype accent: only content kinds that are easy to confuse get a tint;
+// plain text/string takes the row's role color, everything else stays neutral
+const SUB_COLORS = { tool_use: 'var(--tool)', server_tool_use: 'var(--tool)',
+                     tool_result: 'var(--toolresult)', server_tool_result: 'var(--toolresult)',
+                     web_search_tool_result: 'var(--toolresult)',
+                     thinking: 'var(--thinking)', redacted_thinking: 'var(--thinking)' };
+function subColor(r, rcol) {
+  const kinds = blockTypes(r);
+  for (const k of kinds) if (SUB_COLORS[k]) return SUB_COLORS[k];
+  if (kinds.includes('text') || kinds.includes('string')) return rcol;
+  return '';
+}
+
+function renderRow(r) {
+  // same type = same style; isMeta is marked by an addon (filled chip + faint stripes), not a restyle
+  const rcol = ROLE_COLORS[r.type] || 'var(--meta)';
+  const sub = subLabel(r);
+  const scol = subColor(r, rcol);
+  let flags = '';
+  if (r.isMeta) flags += `<span class="fbadge fmeta" title="isMeta: true — injected by the harness, not typed by the user">meta</span>`;
+  if (r._dup != null) flags += `<span class="fbadge" title="re-emitted copy of record #${r._dup} (same uuid, appended on session resume) — not part of the thread">dup #${r._dup}</span>`;
+  const batch = r._cat === 'tool-use' && r.message?.id ? parBatch[r.message.id] : null;
+  if (batch && batch.length > 1) {
+    const pos = batch.indexOf(r._dup != null ? r._dup : r._i);
+    flags += `<span class="fbadge" title="one API message issued ${batch.length} tool calls — records #${batch.join(', #')} ran in parallel">${icon('par', 9)} ${pos + 1}/${batch.length}</span>`;
+  }
+  if (r.isSidechain) flags += `<span class="fbadge">sidechain</span>`;
+  if (r.isCompactSummary) flags += `<span class="fbadge">compact</span>`;
+  if (r.level === 'warning') flags += `<span class="fbadge warn">warning</span>`;
+  if (r.isApiErrorMessage) flags += `<span class="fbadge warn" title="assistant record injected by Claude Code after an API failure — not a real model response">api error</span>`;
+  else if (r.message?.model === '<synthetic>') flags += `<span class="fbadge warn" title="synthetic record fabricated by the harness (model <synthetic>), no API call behind it">synthetic</span>`;
+  if (isInterrupt(r)) flags += `<span class="fbadge warn" title="the user interrupted the in-flight request${r.interruptedMessageId ? ' (message ' + esc(r.interruptedMessageId) + ')' : ''}">interrupt</span>`;
+  if (r.toolDenialKind) flags += `<span class="fbadge warn" title="tool call denied — ${esc(r.toolDenialKind)}">denied</span>`;
+  if (r.type === 'assistant' && r.message?.id && msgFirst[r.message.id] === r._i) {
+    const advN = advisorIters(r.message.usage).length;
+    if (advN) flags += `<span class="fbadge adv" title="this message ran ${advN} hidden advisor call${advN > 1 ? 's' : ''} (${fmtTok(advisorTok(r.message.usage))} tokens NOT counted in its usage totals) — expand for the per-call table">advisor${advN > 1 ? ' ×' + advN : ''}</span>`;
+    if (apiSid && r.message.model !== '<synthetic>') flags += `<a class="fbadge apilink" href="/#s=${encodeURIComponent(apiSid)}&msg=${encodeURIComponent(r.message.id)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="open the API request behind this message in the API dashboard (cache / retries / SSE timing)">API</a>`;
+  }
+  let tail = '', tname = '';
+  const jl = (i, dir) => `<span class="lnk tcol-l" onclick="event.preventDefault();event.stopPropagation();jumpTo(${i})">${dir} #${i}</span>`;
+  const durSpan = (a, b) => {
+    const d = a?.timestamp && b?.timestamp ? +new Date(b.timestamp) - +new Date(a.timestamp) : null;
+    return `<span class="sdur tcol-d" title="wall time between the tool_use record and its tool_result record">${d != null && d >= 0 ? fmtDur(d) : ''}</span>`;
+  };
+  // Hook-layer measured column: the transcript's record interval (sdur) includes harness overhead and approval waits,
+  // while the hook layer's PreToolUse→PostToolUse is net execution wall clock — side by side, the two columns show where the overhead lives
+  const hookSpan = (id) => {
+    if (!hookAny) return '';
+    const h = id && hookMap ? hookMap[id] : null;
+    if (!h) return `<span class="hdur tcol-hd"></span>`;
+    const tip = 'hook layer measured execution (PreToolUse→PostToolUse wall clock): ' +
+      (h.durMs != null ? fmtDur(h.durMs) : 'no PostToolUse yet (running or killed)') +
+      (h.waitMs != null ? ` · approval wait ${fmtDur(h.waitMs)}` : '') +
+      (h.fail ? ' · PostToolUseFailure' : '');
+    return `<span class="hdur tcol-hd${h.fail ? ' err' : ''}" title="${esc(tip)}">${h.durMs != null ? fmtDur(h.durMs) : '…'}</span>`;
+  };
+  if (r._cat === 'tool-use') {
+    const b = (r.message?.content || []).find(x => x.type === 'tool_use' || x.type === 'server_tool_use') || {};
+    if (b.name) tname = `<span class="toolname" title="tool: ${esc(b.name)}">${esc(b.name)}</span>`;
+    const res = resultByToolId[b.id];
+    const rb = res?.message.content.find(x => x.type === 'tool_result' && x.tool_use_id === b.id);
+    const hk = hookMap && b.id ? hookMap[b.id] : null;
+    if (hk?.waitMs != null) flags += `<span class="fbadge warn" title="permission approval wait before this tool ran (PermissionRequest→PreToolUse, from the hook layer)">wait ${fmtDur(hk.waitMs)}</span>`;
+    tail = (res ? jl(res._i, icon('arrowr', 10)) : `<span class="lnk tcol-l"></span>`) + durSpan(r, res) + hookSpan(b.id) +
+           `<span class="sres tcol-s ${rb?.is_error ? 'err' : ''}">${res ? icon(rb?.is_error ? 'x' : 'check', 11) : icon('dots', 11)}</span>`;
+  } else if (r._cat === 'tool-result') {
+    const rb0 = (r.message?.content || []).find(x => x.type === 'tool_result');
+    const u = useByToolId[rb0?.tool_use_id];
+    const cb = u?.message.content.find(x => (x.type === 'tool_use' || x.type === 'server_tool_use') && x.id === rb0?.tool_use_id);
+    if (cb?.name) tname = `<span class="toolname" title="tool: ${esc(cb.name)}">${esc(cb.name)}</span>`;
+    tail = (u ? jl(u._i, icon('arrowl', 10)) : `<span class="lnk tcol-l"></span>`) + durSpan(u, r) + hookSpan(rb0?.tool_use_id) +
+           `<span class="sres tcol-s ${rb0?.is_error ? 'err' : ''}">${icon(rb0?.is_error ? 'x' : 'check', 11)}</span>`;
+  }
+  const k = r._i + ':row';
+  const isOpen = openSet.has(k);
+  return `<details class="row felem${r.level === 'warning' ? ' warnrow' : ''}${r.isMeta ? ' metarow' : ''}" style="--rc:${rcol}" id="rec-${r._i}" data-cat="${r._cat}" data-i="${r._i}" data-k="${k}" ontoggle="onRowToggle(this)" ${isOpen?'open':''}>
+    <summary><span class="rawbtn" title="toggle raw JSON" onclick="openRaw(event, ${r._i})">${icon('code', 9)}</span><span class="lno">${r._i}</span><span class="ts">${fmtTimeMs(r.timestamp)}</span><span class="tbadge" title="${esc(r.type || '?')}">${esc(r.type || '?')}</span>${sub ? `<span class="sbadge"${scol ? ` style="--sc:${scol}"` : ''}>${esc(sub)}</span>` : ''}${tname}${flags}<span class="snip">${esc(snipText(r))}</span>${tail}</summary>
+    <div class="row-body"${isOpen ? '' : ' data-lazy="1"'}>${isOpen ? bodyHTML(r) : ''}</div>
+  </details>`;
+}
+
+// a slim switcher sitting on the versioned message: branch ‹ i / n ›
+function branchBar(f) {
+  const continued = activeSet.has(records[f.selIdx].uuid);
+  const ic = `<svg class="ic" viewBox="0 0 24 24" style="width:12px;height:12px"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>`;
+  return `<div class="branchbar" data-parent="${esc(f.parentUuid)}" tabindex="0" onkeydown="branchKey(event,'${esc(f.parentUuid)}')">
+    ${ic}<span class="brlabel">branch</span>
+    <button class="brbtn" ${f.pos === 0 ? 'disabled' : ''} onclick="event.stopPropagation();branchStep('${esc(f.parentUuid)}',-1)">${icon('chevl', 11)}</button>
+    <span class="brcount"><b>${f.pos + 1}</b> / ${f.n}</span>
+    <button class="brbtn" ${f.pos === f.n - 1 ? 'disabled' : ''} onclick="event.stopPropagation();branchStep('${esc(f.parentUuid)}',1)">${icon('chevr', 11)}</button>
+    ${continued ? '<span class="brtag cont">current</span>' : ''}
+  </div>`;
+}
+
+let tocTurns = [];
+function renderFeed() {
+  const seq = viewMode === 'raw' ? records.map(r => ({ idx: r._i })) : threadOrder();
+  let html = '', n = 0, lastTs = null, loose = 0, shownIdx = new Set();
+  tocTurns = [];
+  // One turn = one submission batch that actually triggers the agent loop. Consecutive user-side records
+  // (slash commands, local-command output, bash input/output) get stitched into the same API send; messages arriving
+  // mid-turn (typed/queued) and new instructions typed after an interrupt merge into the current turn (turn_duration's messageCount confirms this).
+  // Rule (99.8% accurate over the full 665-segment corpus): turn_duration is the authoritative closing signal —
+  // only the next user record after the close unlocks (armed) starts a new turn; old transcripts without that record
+  // fall back to the "unlock once an assistant is seen" heuristic (queued injections then don't count as triggers).
+  const hasTD = records.some(r => r._dup == null && r.type === 'system' && r.subtype === 'turn_duration');
+  let armed = true;
+  const startsTurn = r => {
+    if (r._dup != null) return false;
+    if (r.type === 'system' && r.subtype === 'scheduled_task_fire') return true;
+    if (r._cat !== 'user' || isInterrupt(r)) return false;
+    if (!hasTD && r.promptSource === 'queued') return false;
+    return armed;
+  };
+  seq.forEach(item => {
+    const r = records[item.idx];
+    shownIdx.add(item.idx);
+    const ts = r.timestamp ? +new Date(r.timestamp) : null;
+    if (ts && lastTs && ts - lastTs > GAP_MS) html += `<div class="gap-marker">${fmtDur(ts - lastTs)} gap</div>`;
+    if (ts) lastTs = ts;
+    const isCompact = r.type === 'system' && r.subtype === 'compact_boundary';
+    if (isCompact) {
+      const lp = r.logicalParentUuid != null ? byUuid[r.logicalParentUuid] : undefined;
+      const cm = r.compactMetadata || {};
+      html += `<div class="compactband" id="cb-${r._i}">context compacted${cm.trigger ? ` (${esc(cm.trigger)})` : ''}` +
+        (lp != null ? ` — continues from <a href="#" onclick="event.preventDefault();jumpTo(${lp})">#${lp}</a>` : '') +
+        (cm.preTokens != null ? ` · ${fmtTok(cm.preTokens)} → ${cm.postTokens != null ? fmtTok(cm.postTokens) : '?'} tokens` : '') +
+        (cm.durationMs != null ? ` · took ${fmtDur(cm.durationMs)}` : '') + `</div>`;
+    }
+    if (item.fork) html += branchBar(item.fork);   // branch switcher sits above the TURN marker
+    if (startsTurn(r)) {
+      n++;
+      armed = false;
+      tocTurns.push({ n, first: r._i, snippet: summarize(r).slice(0, 60), plainSnip: false, count: 0, forkIdx: null, compactIdx: null, errIdx: null, errN: 0 });
+      html += `<div class="turnsep">turn ${n}</div>`;
+    } else if (!tocTurns.length) loose++;
+    if (r._dup == null && ((r.type === 'system' && r.subtype === 'turn_duration') ||
+        (!hasTD && r.type === 'assistant'))) armed = true;
+    if (tocTurns.length) {
+      const t = tocTurns[tocTurns.length - 1];
+      t.count++;
+      // within a merged batch, the first "actually typed prompt" makes a better TOC label than the leading command/output records
+      if (!t.plainSnip && r._dup == null && r._cat === 'user' &&
+          typeof r.message?.content === 'string' && !r.message.content.startsWith('<')) {
+        t.snippet = summarize(r).slice(0, 60);
+        t.plainSnip = true;
+      }
+      if (item.fork && t.forkIdx == null) t.forkIdx = item.fork.selIdx;   // jump target = the branch point
+      if (isCompact && t.compactIdx == null) t.compactIdx = r._i;
+      const isErr = (r._cat === 'tool-result' &&
+          (Array.isArray(r.message?.content) ? r.message.content : []).some(b => b && b.is_error)) ||
+          (r.type === 'system' && r.subtype === 'api_error') || r.isApiErrorMessage;
+      if (isErr) {
+        if (t.errIdx == null) t.errIdx = r._i;
+        t.errN++;
+      }
+    }
+    html += renderRow(r);
+  });
+  $('feed').innerHTML = html;
+  const hidden = records.length - shownIdx.size;
+  $('feed').dataset.hidden = hidden;
+  let toc = `<div class="toc-head">Turns · ${n}</div>`;
+  if (loose) toc += `<a class="toc-item" data-n="0" onclick="jumpTo(0)"><span class="toc-n">–</span><span class="toc-t">session preamble</span><span class="toc-c">${loose}</span></a>`;
+  tocTurns.forEach(t => {
+    // the markers are buttons: click jumps straight to that turn's branch / compaction point
+    const ticks =
+      (t.forkIdx != null ? `<span class="toc-tick toc-fork" title="jump to branch point" onclick="event.stopPropagation();jumpTo(${t.forkIdx})">${icon('branch', 10)}</span>` : '') +
+      (t.compactIdx != null ? `<span class="toc-tick toc-compact" title="jump to context-compacted point" onclick="event.stopPropagation();jumpTo(${t.compactIdx})">${icon('compact', 10)}</span>` : '') +
+      (t.errIdx != null ? `<span class="toc-tick toc-err" title="${t.errN} error${t.errN > 1 ? 's' : ''} (failed tool calls / API errors) — jump to first" onclick="event.stopPropagation();jumpTo(${t.errIdx})">${icon('xcircle', 10)}</span>` : '');
+    toc += `<a class="toc-item" data-n="${t.n}" data-first="${t.first}" onclick="jumpTo(${t.first})"><span class="toc-n">${t.n}</span><span class="toc-t" title="${esc(t.snippet)}">${esc(t.snippet)}</span>${ticks}<span class="toc-c">${t.count}</span></a>`;
+  });
+  $('toc').innerHTML = toc;
+  syncTocTop();
+  const tj = $('turnjump'), prev = tj.value;
+  tj.innerHTML = '<option value="">jump to turn…</option>' +
+    (loose ? `<option value="0">preamble (${loose} records)</option>` : '') +
+    tocTurns.map(t => `<option value="${t.first}">turn ${t.n} — ${esc(t.snippet.slice(0, 40))}</option>`).join('');
+  tj.value = prev;
+  tocTrack();
+}
+$('turnjump').addEventListener('change', e => {
+  if (e.target.value !== '') jumpTo(+e.target.value);
+  e.target.value = '';
+});
+
+// keep the sticky TOC below the sticky toolbar, whose height varies when it wraps
+function syncTocTop() {
+  const h = $('toolbar').offsetHeight + 12;
+  const toc = $('toc');
+  toc.style.top = h + 'px';
+  toc.style.maxHeight = `calc(100vh - ${h + 20}px)`;
+}
+window.addEventListener('resize', syncTocTop);
+
+function tocTrack() {
+  if (!tocTurns.length) return;
+  const y = window.scrollY + window.innerHeight * 0.5;  // jumpTo centers targets, so track mid-viewport
+  let cur = 0;
+  for (const t of tocTurns) {
+    const el = document.getElementById('rec-' + t.first);
+    if (el && el.offsetTop <= y) cur = t.n;
+  }
+  document.querySelectorAll('#toc .toc-item').forEach(it => it.classList.toggle('cur', +it.dataset.n === cur));
+}
+window.addEventListener('scroll', tocTrack, { passive: true });
+
+// ---------- ingest (initial + incremental) ----------
+function ingest(objs) {
+  if (!objs.length) return;
+  objs.forEach(o => {
+    if (typeof o !== 'object' || o === null) o = {type: 'parse-error', raw: String(o)};
+    o._i = records.length;
+    o._cat = categorize(o);
+    records.push(o);
+    // first occurrence of a uuid is the canonical node; later ones are re-emissions
+    // (session resume re-appends earlier records) and would otherwise fake forks
+    if (o.uuid) {
+      if (byUuid[o.uuid] == null) byUuid[o.uuid] = o._i;
+      else o._dup = byUuid[o.uuid];
+    }
+    (Array.isArray(o.message?.content) ? o.message.content : []).forEach(b => {
+      if (b.type === 'tool_result' || b.type === 'server_tool_result' || b.type === 'web_search_tool_result') resultByToolId[b.tool_use_id] = o;
+      if (b.type === 'tool_use' || b.type === 'server_tool_use') useByToolId[b.id] = o;
+    });
+    // one API message with several tool_use blocks is split into one record per block:
+    // group them so parallel batches can be labelled ‖ i/n on their rows
+    if (o._dup == null && o.type === 'assistant' && o._cat === 'tool-use' && o.message?.id)
+      (parBatch[o.message.id] = parBatch[o.message.id] || []).push(o._i);
+    // first record of each API message — per-message badges (advisor…) attach here only
+    if (o._dup == null && o.type === 'assistant' && o.message?.id && msgFirst[o.message.id] == null)
+      msgFirst[o.message.id] = o._i;
+  });
+  buildThread();
+  if (!appliedHash) { applyHash(); appliedHash = true; }
+  renderFeed();
+  recompute();
+  syncChips();
+  applyFilters();
+  tryMsgJump();
+}
+let appliedHash = false;
+
+// ---------- aggregates / header / stats / charts ----------
+function recompute() {
+  const sessionId = records.find(r => r.sessionId)?.sessionId || '';
+  const version  = records.find(r => r.version)?.version || '';
+  const cwd      = records.find(r => r.cwd)?.cwd || '';
+  const branch   = records.find(r => r.gitBranch)?.gitBranch || '';
+  const titles   = records.filter(r => r.type === 'ai-title').map(r => r.aiTitle);
+  const tsAll    = records.map(r => r.timestamp).filter(Boolean).map(t => +new Date(t)).sort((a,b)=>a-b);
+  const tMin = tsAll[0], tMax = tsAll[tsAll.length-1];
+
+  const seenMsg = new Map();
+  records.forEach(r => {
+    if (r.type === 'assistant' && r.message?.id && !seenMsg.has(r.message.id)) {
+      seenMsg.set(r.message.id, { id: r.message.id, model: r.message.model, usage: r.message.usage || {}, rec: r._i });
+    }
+  });
+  const apiMsgs = [...seenMsg.values()];
+  const tok = { out: 0, inp: 0, cw: 0, cr: 0 };
+  // per-model rollup + hidden advisor cost + context peak, in one pass
+  const modelAgg = new Map(), advAgg = new Map();
+  let advCalls = 0, advIn = 0, advOut = 0, peakCtx = 0, peakRec = null;
+  apiMsgs.forEach(m => {
+    const u = m.usage;
+    tok.out += u.output_tokens || 0;
+    tok.inp += u.input_tokens || 0;
+    tok.cw  += u.cache_creation_input_tokens || 0;
+    tok.cr  += u.cache_read_input_tokens || 0;
+    const g = modelAgg.get(m.model) || { msgs: 0, out: 0, inp: 0, cr: 0, cw: 0 };
+    g.msgs++; g.out += u.output_tokens || 0; g.inp += u.input_tokens || 0;
+    g.cr += u.cache_read_input_tokens || 0; g.cw += u.cache_creation_input_tokens || 0;
+    modelAgg.set(m.model, g);
+    advisorIters(u).forEach(it => {
+      advCalls++; advIn += it.input_tokens || 0; advOut += it.output_tokens || 0;
+      const am = it.model || 'advisor';
+      const a = advAgg.get(am) || { calls: 0, inp: 0, out: 0 };
+      a.calls++; a.inp += it.input_tokens || 0; a.out += it.output_tokens || 0;
+      advAgg.set(am, a);
+    });
+    const cx = ctxTok(u);
+    if (cx > peakCtx) { peakCtx = cx; peakRec = m.rec; }
+  });
+  const models = [...new Set(apiMsgs.map(m => m.model).filter(Boolean))];
+  const apiErrs = records.filter(r => (r.type === 'system' && r.subtype === 'api_error') || r.isApiErrorMessage);
+  const interrupts = records.filter(isInterrupt);
+  // event markers for the token chart: where compactions / API errors / model switches
+  // land in the sequence of API messages (pos = insertion index between bars)
+  tokEvents = [];
+  const posAfter = rec => { const i = apiMsgs.findIndex(m => m.rec > rec); return i < 0 ? apiMsgs.length : i; };
+  apiMsgs.forEach((m, i) => {
+    if (i > 0 && m.model !== apiMsgs[i - 1].model && m.model !== '<synthetic>' && apiMsgs[i - 1].model !== '<synthetic>')
+      tokEvents.push({ pos: i, kind: 'model', label: `model switch → ${m.model}`, rec: m.rec });
+  });
+  records.forEach(r => {
+    if (r.type === 'system' && r.subtype === 'compact_boundary') {
+      const cm = r.compactMetadata || {};
+      tokEvents.push({ pos: posAfter(r._i), kind: 'compact', rec: r._i,
+        label: `context compacted${cm.trigger ? ' (' + cm.trigger + ')' : ''}${cm.preTokens != null ? ` · ${fmtTok(cm.preTokens)} → ${fmtTok(cm.postTokens || 0)}` : ''}` });
+    } else if (r.type === 'system' && r.subtype === 'api_error') {
+      tokEvents.push({ pos: posAfter(r._i), kind: 'error', rec: r._i,
+        label: `API error · ${(r.error?.formatted || r.error?.message || '')}` });
+    }
+  });
+  // prompt-cache misses: a large context suddenly reads ~nothing from cache and re-sends
+  // everything fresh (TTL expiry / cold resume) — pure cost, invisible unless marked
+  apiMsgs.forEach((m, i) => {
+    if (i === 0) return;
+    const u = m.usage, prev = apiMsgs[i - 1];
+    if ((u.cache_read_input_tokens || 0) < 1024 && ctxTok(prev.usage) > 20000 &&
+        (u.cache_creation_input_tokens || 0) + (u.input_tokens || 0) > 20000 &&
+        m.model === prev.model &&
+        !tokEvents.some(e => e.kind === 'compact' && e.pos === i)) {
+      tokEvents.push({ pos: i, kind: 'miss', rec: m.rec,
+        label: `prompt cache miss — ${fmtTok((u.cache_creation_input_tokens || 0) + (u.input_tokens || 0))} tokens re-sent fresh` });
+    }
+  });
+
+  const userPrompts = records.filter(r => r._cat === 'user' && typeof r.message?.content === 'string' && !r.message.content.startsWith('<'));
+  const allUserMsgs = records.filter(r => r._cat === 'user');
+  // A tool call is a tool_use BLOCK, not a record: assistant messages routinely carry [text, tool_use] or
+  // [thinking, text, tool_use], and one message can issue several calls in parallel. Categorising by the
+  // first block (r._cat) therefore undercounts badly — count blocks, and keep every record that holds one.
+  const isUse = b => b && (b.type === 'tool_use' || b.type === 'server_tool_use');
+  const toolCalls = records.filter(r => r.type === 'assistant' && (Array.isArray(r.message?.content) ? r.message.content : []).some(isUse));
+  const toolUseBlocks = toolCalls.flatMap(r => r.message.content.filter(isUse).map(b => ({ r, b })));
+  const turnDurs = records.filter(r => r.type === 'system' && r.subtype === 'turn_duration');
+  const warnings = records.filter(r => r.level === 'warning');
+  const hooks = records.filter(r => r.subtype === 'stop_hook_summary');
+  const queueOps = records.filter(r => r.type === 'queue-operation');
+
+  // header — custom (user-set) title wins over AI title; subagents fall back to their agent
+  // name (in-file record, or the sibling meta.json surfaced via /api/meta)
+  const customTitles = records.filter(r => r.type === 'custom-title').map(r => r.customTitle);
+  const agentName = records.find(r => r.type === 'agent-name')?.agentName || serverMeta?.agentName;
+  const title = customTitles[customTitles.length-1] || titles[titles.length-1] ||
+    (agentName ? `subagent · ${agentName}` : (P ? P.split('/').pop() : 'Claude Code Session'));
+  $('title').textContent = title;
+  document.title = title + ' — Viewer';
+  $('session-meta').innerHTML = [
+    sessionId && `session <b>${esc(sessionId.slice(0,8))}…</b>`,
+    version && `claude-code <b>v${esc(version)}</b>`,
+    cwd && `cwd <b>${esc(cwd)}</b>`,
+    branch && `branch <b>${esc(branch)}</b>`,
+    tMin && `<b>${fmtDateTime(tMin)}</b> → <b>${fmtDateTime(tMax)}</b>`,
+  ].filter(Boolean).join('<span style="color:var(--border)">·</span> ');
+
+  // overview: KPI tiles + composition bars + compact meta strip
+  const avgTurn = turnDurs.length ? turnDurs.reduce((a,r)=>a+r.durationMs,0)/turnDurs.length : null;
+  const toolErrs = toolUseBlocks.filter(({ b }) => {
+    const res = resultByToolId[b.id];
+    return res?.message.content.some(x => x.type === 'tool_result' && x.tool_use_id === b.id && x.is_error);
+  }).length;
+  const kpi = (v, l, s) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`;
+  const compBar = (title, right, segs) => {
+    const total = segs.reduce((a, s) => a + s[1], 0) || 1;
+    return `<div class="ovbar"><div class="ovbar-head"><span>${title}</span><span>${right}</span></div>` +
+      `<div class="ovbar-track">` + segs.filter(s => s[1] > 0).map(([label, n, c]) =>
+        `<span style="width:${(n/total*100).toFixed(2)}%;background:${c}" title="${esc(label)}: ${fmtNum(n)} (${(n/total*100).toFixed(1)}%)"></span>`).join('') + `</div>` +
+      `<div class="ovbar-legend">` + segs.map(([label, n, c]) =>
+        `<span><i style="background:${c}"></i>${esc(label)} <b>${typeof n === 'number' && n >= 1000 ? fmtTok(n) : fmtNum(n)}</b></span>`).join('') + `</div></div>`;
+  };
+  const catSegs = Object.entries(CATS).map(([k, c]) => [c.label, records.filter(r => r._cat === k).length, LANE_COLORS[k]]);
+  const tokSegs = [
+    ['output', tok.out, 'var(--tok-output)'],
+    ['input (fresh)', tok.inp, 'var(--tok-input)'],
+    ['cache write', tok.cw, 'var(--tok-write)'],
+    ['cache read', tok.cr, 'var(--tok-read)'],
+    ...(advCalls ? [['advisor (hidden)', advIn + advOut, 'var(--tok-advisor)']] : []),
+  ];
+  const mpill = (label, val, warn) => val ? `<span class="pill"${warn ? ' style="border-color:var(--warning);color:var(--warning)"' : ''}>${label} <b>${val}</b></span>` : '';
+  $('overview').innerHTML =
+    `<div class="kpis">` +
+      kpi(records.length, 'Records', `${tsAll.length} timestamped`) +
+      kpi(turnDurs.length || tocTurns.length, 'Turns', avgTurn != null ? `avg ${fmtDur(Math.round(avgTurn))}` : '') +
+      kpi(userPrompts.length, 'User Prompts', `${allUserMsgs.length} user records total`) +
+      kpi(toolUseBlocks.length, 'Tool Calls', toolErrs ? `<span style="color:var(--warning);cursor:pointer" title="jump to first failed tool call" onclick="jumpTo(${records.find(r => r._cat === 'tool-result' && (Array.isArray(r.message?.content) ? r.message.content : []).some(b => b && b.is_error))?._i ?? 0})">${toolErrs} errored</span>` : 'no errors') +
+      kpi(tMin ? fmtDur(tMax - tMin) : '—', 'Session Span', tMin ? `${fmtTime(tMin)} – ${fmtTime(tMax)}` : '') +
+      kpi(peakCtx ? fmtTok(peakCtx) : '—', 'Peak Context',
+        peakCtx ? `<span style="cursor:pointer;color:var(--accent)" title="largest single-call context (input + cache read + cache write) — click to jump" onclick="jumpTo(${peakRec})">input+cache max · #${peakRec} ${icon('arrowr', 9)}</span>` : '') +
+    `</div>` +
+    `<div class="ovrow"><div class="ovcol-main">` +
+      compBar('Record mix', `${records.length} records · each counted once, by its leading content block`, catSegs) +
+      compBar('Token usage', `${fmtTok(tok.out + tok.inp + tok.cw + tok.cr + advIn + advOut)} total · ${apiMsgs.length} API messages`, tokSegs) +
+    `</div><div class="ovcol-side"><div class="ovbar ovturns"><div class="ovbar-head"><span>Turn Durations</span>` +
+      `<span title="each turn's wall time split by where it went (approximate: parallel tools overlap)">` +
+      `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--assistant-fill);margin-right:3px;vertical-align:-1px"></i>model ` +
+      `<i style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--tool-fill);margin:0 3px 0 7px;vertical-align:-1px"></i>tools · ${turnDurs.length || 0}</span></div><div id="chart-turns"></div></div></div></div>` +
+    `<div class="metastrip">` +
+      (forkCount ? `<span class="pill" style="border-color:color-mix(in srgb,var(--branch) 55%,transparent);color:var(--branch)">branch points <b>${forkCount}</b></span>` : '') +
+      models.map(m => mpill('model', esc(m))).join('') +
+      (advCalls ? `<span class="pill" style="border-color:color-mix(in srgb,var(--tok-advisor) 55%,transparent);color:var(--tok-advisor)" title="hidden advisor inference calls — their tokens are NOT in the headline usage totals">advisor calls <b>${advCalls}</b> · ${fmtTok(advIn + advOut)} tok</span>` : '') +
+      mpill('claude-code', version ? 'v' + esc(version) : '') +
+      mpill('API messages', apiMsgs.length) +
+      mpill('API errors', apiErrs.length, true) +
+      mpill('interrupts', interrupts.length, true) +
+      mpill('warnings', warnings.length, true) +
+      mpill('hook firings', hooks.length) +
+      mpill('queue ops', queueOps.length) +
+      mpill('entrypoint', esc(records.find(r => r.entrypoint)?.entrypoint || '')) +
+      (records.some(r => r.sessionKind === 'bg') ? mpill('session', 'background') : '') +
+    `</div>`;
+  $('leg-advisor').style.display = advCalls ? '' : 'none';
+  const tokModels = $('tok-models');
+  if (modelAgg.size > 1 || advAgg.size) {
+    const rows = [...modelAgg.entries()].map(([m, g]) =>
+      `<tr><td>${esc(m || '?')}</td><td>${fmtNum(g.msgs)}</td><td>${fmtTok(g.out)}</td><td>${fmtTok(g.inp)}</td><td>${fmtTok(g.cr)}</td><td>${fmtTok(g.cw)}</td></tr>`).join('') +
+      [...advAgg.entries()].map(([m, a]) =>
+      `<tr class="advrow"><td><span style="display:inline-flex;align-items:center;gap:4px;white-space:nowrap">${icon('cornerdr', 10)}advisor · ${esc(m)}</span></td><td>${fmtNum(a.calls)}</td><td>${fmtTok(a.out)}</td><td>${fmtTok(a.inp)}</td><td>—</td><td>—</td></tr>`).join('');
+    tokModels.innerHTML = `<table class="ttab"><thead><tr><th>model</th><th>msgs</th><th>output</th><th>input</th><th>cache r</th><th>cache w</th></tr></thead><tbody>${rows}</tbody></table>`;
+    tokModels.style.display = '';
+  } else tokModels.style.display = 'none';
+  $('viewtoggle').style.display = forkCount ? '' : 'none';
+
+  renderTypeChart();
+  renderToolChart(toolCalls);
+  renderTimeline(tMin, tMax);
+  renderTokenChart(apiMsgs);
+  renderTurnChart(turnDurs);
+}
+
+// items: [label, n, color?, title?, valHtml?] — title/valHtml let callers attach detail without new markup
+function hbars(el, items, color) {
+  const max = Math.max(...items.map(i => i[1]), 1);
+  el.innerHTML = items.map(([label, n, c, title, valHtml]) => `
+    <div class="hbar-row"${title ? ` title="${esc(title)}"` : ''}>
+      <div class="hbar-label" title="${esc(title || label)}">${esc(label)}</div>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${(n/max*100).toFixed(1)}%;background:${c || color}"></div></div>
+      <div class="hbar-val">${valHtml || n}</div>
+    </div>`).join('');
+}
+
+function renderTypeChart() {
+  const counts = {};
+  records.forEach(r => {
+    let key = r.type;
+    if (r.type === 'assistant') key = 'assistant:' + (r.message?.content?.[0]?.type || '?');
+    else if (r.type === 'user') key = r._cat === 'tool-result' ? 'user:tool_result' : (r.isMeta ? 'user:meta' : 'user:prompt');
+    else if (r.type === 'system') key = 'system:' + (r.subtype || '?');
+    counts[key] = (counts[key] || 0) + 1;
+  });
+  const items = Object.entries(counts).sort((a,b) => b[1]-a[1]).map(([k,n]) => {
+    const base = k.split(':')[0];
+    const c = base === 'user' ? 'var(--user-fill)' : base === 'assistant' ? 'var(--assistant-fill)' : base === 'system' ? 'var(--system-fill)' : 'var(--meta-fill)';
+    return [k, n, c];
+  });
+  hbars($('chart-types'), items);
+}
+
+function renderToolChart(toolCalls) {
+  // per tool: call count + error count + wall-time stats (tool_use record → tool_result record)
+  const stats = {};
+  toolCalls.forEach(r => r.message.content.forEach(b => {
+    if (b.type !== 'tool_use' && b.type !== 'server_tool_use') return;
+    const s = stats[b.name] = stats[b.name] || { n: 0, err: 0, tot: 0, durN: 0, max: 0 };
+    s.n++;
+    const res = resultByToolId[b.id];
+    if (!res) return;
+    const rb = (Array.isArray(res.message?.content) ? res.message.content : []).find(x => x.tool_use_id === b.id);
+    if (rb?.is_error) s.err++;
+    if (r.timestamp && res.timestamp) {
+      const d = +new Date(res.timestamp) - +new Date(r.timestamp);
+      if (d >= 0) { s.tot += d; s.durN++; s.max = Math.max(s.max, d); }
+    }
+  }));
+  const items = Object.entries(stats).sort((a, b) => b[1].n - a[1].n).map(([name, s]) => {
+    const durTxt = s.durN ? `avg ${fmtDur(Math.round(s.tot / s.durN))} · max ${fmtDur(s.max)} · total ${fmtDur(s.tot)}` : 'no timing data';
+    return [name, s.n, 'var(--tool-fill)',
+      `${name} — ${s.n} calls${s.err ? ` · ${s.err} errored` : ''} · ${durTxt}`,
+      `${s.n}${s.err ? ` <span style="color:var(--warning)">${icon('x', 8)}${s.err}</span>` : ''}`];
+  });
+  if (items.length) hbars($('chart-tools'), items, 'var(--tool-fill)');
+  else $('chart-tools').innerHTML = '<div class="empty-note">No tool calls in this session.</div>';
+}
+
+function renderTimeline(tMin, tMax) {
+  const el = $('chart-timeline');
+  const evts = records.filter(r => r.timestamp);
+  if (!evts.length || !(tMax > tMin)) {
+    el.innerHTML = '<div class="empty-note">Not enough timestamped events yet.</div>';
+    return;
+  }
+  // density strips: time is bucketed so the chart stays readable at any record count
+  const lanes = Object.keys(CATS);
+  const B = Math.max(40, Math.min(160, Math.ceil(evts.length / 2)));
+  const W = 1100, padL = 90, padR = 20, rowH = 22, padT = 8, padB = 26;
+  const H = padT + lanes.length * rowH + padB;
+  const bw = (W - padL - padR) / B;
+  const buckets = {};
+  lanes.forEach(l => buckets[l] = Array.from({length: B}, () => ({ n: 0, first: null, warn: false })));
+  evts.forEach(r => {
+    if (!buckets[r._cat]) return;
+    let bi = Math.floor((+new Date(r.timestamp) - tMin) / (tMax - tMin) * B);
+    if (bi >= B) bi = B - 1;
+    if (bi < 0) bi = 0;
+    const b = buckets[r._cat][bi];
+    b.n++;
+    if (b.first == null) b.first = r._i;
+    if (r.level === 'warning' || r.level === 'error' || r.isApiErrorMessage) b.warn = true;
+  });
+  const maxN = Math.max(1, ...lanes.flatMap(l => buckets[l].map(b => b.n)));
+  let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">`;
+  lanes.forEach((lane, li) => {
+    const y = padT + li * rowH;
+    svg += `<line class="gridline" x1="${padL}" y1="${y + rowH/2}" x2="${W-padR}" y2="${y + rowH/2}"/>`;
+    svg += `<text class="axis" x="${padL-8}" y="${y + rowH/2 + 3}" text-anchor="end">${CATS[lane].label}</text>`;
+    buckets[lane].forEach((b, bi) => {
+      if (!b.n) return;
+      const op = (0.3 + 0.7 * Math.sqrt(b.n / maxN)).toFixed(2);
+      const t0 = tMin + (tMax - tMin) * bi / B, t1 = tMin + (tMax - tMin) * (bi + 1) / B;
+      svg += `<rect x="${(padL + bi * bw).toFixed(1)}" y="${y + 3}" width="${Math.max(bw - 0.6, 1).toFixed(1)}" height="${rowH - 6}" rx="1.5" ` +
+             `fill="${b.warn ? 'var(--warning-fill)' : LANE_COLORS[lane]}" opacity="${op}" style="cursor:pointer" onclick="jumpTo(${b.first})">` +
+             `<title>${CATS[lane].label} · ${b.n} record${b.n > 1 ? 's' : ''} · ${fmtTime(t0)}–${fmtTime(t1)} — click: jump to #${b.first}</title></rect>`;
+    });
+  });
+  for (let i = 0; i <= 6; i++) {
+    const t = tMin + (tMax - tMin) * i / 6;
+    svg += `<text class="axis" x="${padL + (W-padL-padR)*i/6}" y="${H-8}" text-anchor="middle">${fmtTime(t)}</text>`;
+  }
+  el.innerHTML = svg + '</svg>';
+}
+
+// Token chart = focus+context: a compressed overview of ALL messages (fits the full width,
+// never scrolls) + a live zoom strip that follows the cursor for readable detail of any region.
+const TOK_SERIES = [
+  ['cache read',  'cache_read_input_tokens',     'var(--tok-read)'],
+  ['cache write', 'cache_creation_input_tokens', 'var(--tok-write)'],
+  ['input',       'input_tokens',                'var(--tok-input)'],
+  ['output',      'output_tokens',               'var(--tok-output)'],
+];
+const tokTotal = m => TOK_SERIES.reduce((a, s) => a + (m.usage[s[1]] || 0), 0);
+// Adaptive single pane: by default one pane shows all messages (hover crosshair + readout give exact numbers for any bar);
+// only drag-selecting drills down — the main chart rescales to the selected range while a slim minimap slides out to keep
+// global orientation (click it to pan, drag it to reselect). click = pin focus; dblclick = jump to record; ←/→ step; Esc exits the drill-down first, then releases the pin.
+// On live poll re-renders the pinned focus/drill-down range stay put; when unpinned and not drilled down, follow the latest message.
+let tokState = null, tokFocus = -1, tokResizeT = null, tokEvents = [];
+let tokPin = false, tokView = null, tokDrag = null, tokMiniDrag = null;  // tokView: drill-down range {start,end}; null = full range
+
+function tokStack(m, x, bw, base, h, maxT, fancy) {   // stacked bars for one message (+ hidden advisor on top)
+  // fancy (main chart & bars wide enough): 1.5px surface-color gaps between segments + rounded tops — the same bar craftsmanship as the API view's "context composition"
+  const segs = TOK_SERIES.map(([, key, c]) => [c, m.usage[key] || 0]).filter(sg => sg[1] > 0);
+  const av = advisorTok(m.usage);
+  if (av) segs.push(['var(--tok-advisor)', av]);
+  let y = base, s = '';
+  segs.forEach(([c, v], si) => {
+    const bh = Math.max(v / maxT * h, 0.4);
+    y -= bh;
+    const isTop = si === segs.length - 1;
+    if (fancy && isTop && bh > 3) {
+      const rr = Math.min(2.5, bw / 2), x1 = x + bw;
+      s += `<path d="M${x.toFixed(2)},${(y + bh).toFixed(2)} L${x.toFixed(2)},${(y + rr).toFixed(2)} Q${x.toFixed(2)},${y.toFixed(2)} ${(x + rr).toFixed(2)},${y.toFixed(2)} L${(x1 - rr).toFixed(2)},${y.toFixed(2)} Q${x1.toFixed(2)},${y.toFixed(2)} ${x1.toFixed(2)},${(y + rr).toFixed(2)} L${x1.toFixed(2)},${(y + bh).toFixed(2)} Z" fill="${c}"/>`;
+    } else {
+      s += `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${bw.toFixed(2)}" height="${bh.toFixed(2)}" fill="${c}"/>`;
+    }
+    if (fancy && si > 0 && bh > 2.5) {
+      s += `<rect x="${x.toFixed(2)}" y="${(y + bh - 0.75).toFixed(2)}" width="${bw.toFixed(2)}" height="1.5" fill="var(--panel)"/>`;
+    }
+  });
+  return s;
+}
+
+// vertical event markers (compaction / API error / model switch / cache miss) between the bars
+const EV_COLORS = { compact: 'var(--compact)', error: 'var(--warning-fill)', model: 'var(--accent)', miss: 'var(--tok-write)' };
+const EV_ICONS = { compact: ICON_PATHS.compact, error: ICON_PATHS.x, model: ICON_PATHS.repeat, miss: ICON_PATHS.zap };
+function tokEventGroups() {
+  const g = new Map();
+  tokEvents.forEach(e => {
+    const k = e.pos + ':' + e.kind;
+    const cur = g.get(k) || { pos: e.pos, kind: e.kind, n: 0, labels: [], rec: e.rec };
+    cur.n++; cur.labels.push(e.label);
+    g.set(k, cur);
+  });
+  return [...g.values()];
+}
+function tokMarker(g, x, top, bottom) {
+  const c = EV_COLORS[g.kind];
+  const title = `<title>${esc(g.labels.join('\n'))} — click: jump to #${g.rec}</title>`;
+  return `<g style="cursor:pointer" onclick="event.stopPropagation();jumpTo(${g.rec})">` +
+    `<line x1="${x.toFixed(1)}" y1="${top}" x2="${x.toFixed(1)}" y2="${bottom}" stroke="${c}" stroke-width="1" stroke-dasharray="3 2"/>` +
+    `<g transform="translate(${(x - 4.5).toFixed(1)},${top + 1}) scale(0.375)" stroke="${c}" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${EV_ICONS[g.kind]}</g>` +
+    (g.n > 1 ? `<text x="${(x + 6.5).toFixed(1)}" y="${top + 9}" font-size="8.5" fill="${c}">${g.n}</text>` : '') +
+    `<rect x="${(x - 4).toFixed(1)}" y="${top}" width="8" height="${bottom - top}" fill="transparent">${title}</rect></g>`;
+}
+function niceTicks(max, count) {
+  if (max <= 0) return [0];
+  const step = Math.pow(10, Math.floor(Math.log10(max / count)));
+  const err = max / count / step;
+  const mult = err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1;
+  const s = step * mult;
+  const ticks = [];
+  for (let t = 0; t <= max + 1e-9; t += s) ticks.push(t);
+  return ticks;
+}
+function tokAxis(ticks, yMax, padL, plotW, top, base) {
+  let s = '';
+  for (const tk of ticks) {
+    const y = base - tk / yMax * (base - top);
+    s += `<line class="gridline" x1="${padL}" y1="${y.toFixed(1)}" x2="${padL + plotW}" y2="${y.toFixed(1)}"/>`;
+    s += `<text class="axis" x="${padL - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end">${fmtTok(tk)}</text>`;
+  }
+  return s;
+}
+
+function renderTokenChart(apiMsgs) {
+  const el = $('chart-tokens');
+  if (!apiMsgs.length) { el.innerHTML = '<div class="empty-note">No API usage data yet.</div>'; tokState = null; return; }
+  const N = apiMsgs.length;
+  const W = Math.max(el.clientWidth || 900, 360);
+  const padL = 46, padR = 8;
+  tokState = { apiMsgs, N, W, padL, plotW: W - padL - padR };
+  // clamp the drill-down range as data grows (N increases during a live session)
+  if (tokView) {
+    tokView.start = Math.max(0, Math.min(tokView.start, N - 2));
+    tokView.end = Math.max(tokView.start + 2, Math.min(tokView.end, N));
+  }
+  el.innerHTML = `<div id="tok-mini" style="display:none;margin-bottom:3px"></div>` +
+    `<div id="tok-main"></div>` +
+    `<div class="tok-readout" id="tok-readout"></div>`;
+  // keep the pinned/drilled-down focus across live updates; follow the latest message only when at full range and unpinned
+  tokRender((tokPin || tokView) && tokFocus >= 0 ? tokFocus : N - 1);
+}
+
+const tokRange = () => tokView ? [tokView.start, tokView.end] : [0, tokState.N];
+
+function tokRender(focus) {
+  if (!tokState) return;
+  const { apiMsgs, N, W, padL, plotW } = tokState;
+  tokFocus = Math.max(0, Math.min(N - 1, focus));
+  const [start, end] = tokRange(), len = end - start;
+  // ---- Main chart: the current range (full by default) ----
+  const H = 150, padT = 12, padB = 16, base = H - padB, h = base - padT;
+  const view = apiMsgs.slice(start, end);
+  const maxT = Math.max(...view.map(m => tokTotal(m) + advisorTok(m.usage)), 1);
+  // Model context-limit reference line (same mechanism as the API view): ctx = input + cache read + cache write;
+  // a peak above 200K necessarily means the 1M window. When context nears the limit, draw the limit into the chart — when compaction will hit is visible at a glance
+  const maxCtx = Math.max(...apiMsgs.map(m => ctxTok(m.usage)), 0);
+  const limit = maxCtx > 200000 ? 1000000 : 200000;
+  const showLimit = maxCtx > limit * 0.5;
+  const ticks = niceTicks(showLimit ? limit : maxT, 4);
+  const yMax = showLimit ? Math.max(limit * 1.04, maxT) : Math.max(ticks[ticks.length - 1], maxT);
+  const slot = plotW / len, bw = Math.max(slot * (len > 150 ? 0.92 : 0.78), 0.5);
+  tokState.v = { start, end, slot, padT, h, base };
+  let s = `<svg id="tok-main-svg" width="${W}" height="${H}" style="display:block;cursor:crosshair;user-select:none;touch-action:none" ` +
+    `onpointerdown="tokDown(event)" onpointermove="tokMove(event)" onpointerup="tokUp(event)" onpointerleave="tokLeave()" ondblclick="tokDbl(event)">`;
+  s += tokAxis(ticks, yMax, padL, plotW, padT, base);
+  if (showLimit) {
+    const ly = base - limit / yMax * h;
+    s += `<line class="limit-line" x1="${padL}" y1="${ly.toFixed(1)}" x2="${padL + plotW}" y2="${ly.toFixed(1)}"/>` +
+      `<text class="limit-label" x="${padL + plotW}" y="${(ly - 4).toFixed(1)}" text-anchor="end">context limit ${fmtTok(limit)} · peak ${Math.round(maxCtx / limit * 100)}%</text>`;
+  }
+  s += `<rect id="tok-hl" x="0" y="${padT}" width="0" height="${h}" fill="color-mix(in srgb,var(--accent) 12%,transparent)" rx="1" style="display:none;pointer-events:none"/>`;
+  const fancy = bw >= 4;
+  view.forEach((m, j) => { s += tokStack(m, padL + j * slot, bw, base, h, yMax, fancy); });
+  const le = Math.max(1, Math.ceil(len / 12));
+  for (let j = 0; j < len; j += le)
+    s += `<text class="axis" x="${(padL + j * slot + bw / 2).toFixed(1)}" y="${H - 4}" text-anchor="middle">${start + j + 1}</text>`;
+  tokEventGroups().forEach(g => {
+    if (g.pos >= start && g.pos <= end) s += tokMarker(g, padL + (g.pos - start) * slot - slot * 0.07, padT, base);
+  });
+  s += `<rect id="tok-sel" x="0" y="${padT}" width="0" height="${h}" fill="color-mix(in srgb,var(--accent) 16%,transparent)" stroke="var(--accent)" stroke-width="0.8" style="display:none;pointer-events:none"/></svg>`;
+  $('tok-main').innerHTML = s;
+  // ---- Minimap: appears only when drilled down; handles global orientation (click to pan / drag-select a new range) ----
+  const mini = $('tok-mini');
+  if (tokView) {
+    const mH = 34, mPadT = 2, mBase = mH - 3, mh = mBase - mPadT;
+    const gMax = Math.max(...apiMsgs.map(m => tokTotal(m) + advisorTok(m.usage)), 1);
+    const ms = plotW / N, mbw = Math.max(ms * 0.9, 0.4);
+    let mm = `<svg width="${W}" height="${mH}" style="display:block;cursor:pointer;user-select:none;touch-action:none" ` +
+      `onpointerdown="tokMiniDown(event)" onpointermove="tokMiniMove(event)" onpointerup="tokMiniUp(event)">`;
+    apiMsgs.forEach((m, i) => { mm += tokStack(m, padL + i * ms, mbw, mBase, mh, gMax); });
+    tokEventGroups().forEach(g => {
+      const x = (padL + g.pos * ms).toFixed(1);
+      mm += `<line x1="${x}" y1="${mPadT}" x2="${x}" y2="${mBase}" stroke="${EV_COLORS[g.kind]}" stroke-width="1" opacity="0.8"/>`;
+    });
+    mm += `<rect id="tok-mwin" x="${(padL + start * ms).toFixed(1)}" y="0" width="${Math.max(len * ms, 2).toFixed(1)}" height="${mH}" ` +
+      `fill="color-mix(in srgb,var(--accent) 14%,transparent)" stroke="var(--accent)" stroke-width="0.8" style="pointer-events:none"/></svg>`;
+    mini.innerHTML = mm; mini.style.display = '';
+  } else { mini.innerHTML = ''; mini.style.display = 'none'; }
+  tokReadout();
+  tokMoveHl();
+}
+
+// The focus highlight band is a standalone element: hover only moves it + refreshes the readout, without rebuilding the SVG
+function tokMoveHl() {
+  const hl = document.getElementById('tok-hl');
+  if (!hl || !tokState?.v) return;
+  const { start, end, slot } = tokState.v;
+  if (tokFocus >= start && tokFocus < end) {
+    hl.setAttribute('x', (tokState.padL + (tokFocus - start) * slot - 0.5).toFixed(1));
+    hl.setAttribute('width', Math.max(slot, 2).toFixed(1));
+    hl.style.display = '';
+  } else hl.style.display = 'none';
+}
+
+function tokReadout() {
+  if (!tokState || tokFocus < 0) return;
+  const { apiMsgs, N } = tokState;
+  const m = apiMsgs[tokFocus], u = m.usage;
+  const av = advisorTok(u), cc = u.cache_creation || {};
+  $('tok-readout').innerHTML =
+    `<b>msg ${tokFocus + 1}</b><span class="tsep">/${N}</span>` +
+    (tokPin ? `<span class="tok-pinchip" onclick="tokUnpin()" title="focus is pinned — click here or press Esc to resume hover-scrubbing">pinned ${icon('x', 8)}</span>` : '') +
+    (tokView ? `<span class="tok-pinchip" onclick="tokResetZoom()" title="zoomed to a drag-selected range — click here or press Esc to zoom back out to all messages">msgs ${tokView.start + 1}–${tokView.end} · reset ${icon('x', 8)}</span>` : '') +
+    `<span class="tmodel">${esc(m.model || '')}</span>` +
+    TOK_SERIES.map(([name, key, c]) =>
+      `<span class="tk" ${key === 'cache_creation_input_tokens' && (cc.ephemeral_5m_input_tokens || cc.ephemeral_1h_input_tokens) ? `title="cache write by TTL tier: 5m ${fmtNum(cc.ephemeral_5m_input_tokens || 0)} · 1h ${fmtNum(cc.ephemeral_1h_input_tokens || 0)}"` : ''}><i style="background:${c}"></i>${name} <b>${fmtNum(u[key] || 0)}</b></span>`).join('') +
+    (av ? `<span class="tk" title="hidden advisor tokens — not in this message's usage totals"><i style="background:var(--tok-advisor)"></i>advisor <b>${fmtNum(av)}</b></span>` : '') +
+    `<span class="tk" title="context loaded for this call: input + cache read + cache write">ctx <b>${fmtTok(ctxTok(u))}</b></span>` +
+    `<span class="tk">total <b>${fmtNum(tokTotal(m))}</b></span>` +
+    (m.rec != null ? `<a class="tjump" onclick="jumpTo(${m.rec})">jump to #${m.rec} ${icon('arrowr', 10)}</a>` : '');
+}
+
+// ---- Floating tooltip: the same interaction language as the API view's "context composition" (follows the cursor, flips at edges, pointer-events:none) ----
+function showTip(html, x, y) {
+  const t = document.getElementById('tooltip');
+  t.innerHTML = html; t.style.display = 'block';
+  const r = t.getBoundingClientRect();
+  let left = x + 14, top = y + 14;
+  if (left + r.width > innerWidth - 8) left = x - r.width - 10;
+  if (top + r.height > innerHeight - 8) top = y - r.height - 10;
+  t.style.left = left + 'px'; t.style.top = top + 'px';
+}
+function hideTip() { const t = document.getElementById('tooltip'); if (t) t.style.display = 'none'; }
+const ttRow = (c, label, val, extra) =>
+  `<div class="tt-row"${extra || ''}><i class="k" style="background:${c}"></i>${label}<b>${val}</b></div>`;
+
+function tokTip(i) {
+  const m = tokState.apiMsgs[i], u = m.usage;
+  const av = advisorTok(u), cc = u.cache_creation || {};
+  const wTitle = (cc.ephemeral_5m_input_tokens || cc.ephemeral_1h_input_tokens)
+    ? ` title="cache write by TTL: 5m ${fmtNum(cc.ephemeral_5m_input_tokens || 0)} · 1h ${fmtNum(cc.ephemeral_1h_input_tokens || 0)}"` : '';
+  return `<div class="tt-title">msg ${i + 1}/${tokState.N} · ${esc(modelShortName(m.model))}</div>` +
+    ttRow('var(--tok-read)', 'cache read', fmtNum(u.cache_read_input_tokens || 0)) +
+    ttRow('var(--tok-write)', 'cache write', fmtNum(u.cache_creation_input_tokens || 0), wTitle) +
+    ttRow('var(--tok-input)', 'input (fresh)', fmtNum(u.input_tokens || 0)) +
+    ttRow('var(--tok-output)', 'output', fmtNum(u.output_tokens || 0)) +
+    (av ? ttRow('var(--tok-advisor)', 'advisor (hidden)', fmtNum(av)) : '') +
+    ttRow('var(--meta-fill)', 'total', fmtNum(tokTotal(m)));
+}
+const modelShortName = m => (m || '').replace(/^claude-/, '').replace(/-\d{8}$/, '') || '?';
+
+// ---- Main-chart gestures: hover shows the tooltip + refreshes the readout when unpinned · click pins · drag drills down · dblclick jumps to the record ----
+const tokEvX = ev => { const r = ev.currentTarget.getBoundingClientRect(); return (ev.clientX - r.left) / r.width * tokState.W; };
+const tokXIdx = x => { const [s, e] = tokRange(); return Math.max(0, Math.min(tokState.N - 1, s + Math.floor((x - tokState.padL) / tokState.plotW * (e - s)))); };
+function tokDown(ev) {
+  if (!tokState) return;
+  ev.currentTarget.setPointerCapture(ev.pointerId);
+  tokDrag = { x0: tokEvX(ev), moved: false };
+  $('chart-tokens').focus({ preventScroll: true });
+}
+function tokMove(ev) {
+  if (!tokState) return;
+  const x = tokEvX(ev);
+  if (tokDrag) {
+    if (Math.abs(x - tokDrag.x0) > 4) tokDrag.moved = true;
+    if (tokDrag.moved) {   // drill-down selection preview (hide the tooltip here; the selection itself is the feedback)
+      hideTip();
+      const sel = document.getElementById('tok-sel');
+      const a = Math.min(tokDrag.x0, x), b = Math.max(tokDrag.x0, x);
+      if (sel) { sel.setAttribute('x', a.toFixed(1)); sel.setAttribute('width', (b - a).toFixed(1)); sel.style.display = ''; }
+    }
+    return;
+  }
+  const i = tokXIdx(x);
+  if (!tokState.apiMsgs[i]) return; // events on a detached node (re-render race) would compute a NaN index
+  // the floating tooltip always follows the cursor — even while pinned you can hover to compare other bars
+  showTip(tokTip(i), ev.clientX, ev.clientY);
+  if (!tokPin && i !== tokFocus) { tokFocus = i; tokMoveHl(); tokReadout(); }
+}
+function tokUp(ev) {
+  if (!tokState || !tokDrag) return;
+  const x = tokEvX(ev), moved = tokDrag.moved, x0 = tokDrag.x0;
+  tokDrag = null;
+  if (moved) {
+    const a = tokXIdx(Math.min(x0, x)), b = tokXIdx(Math.max(x0, x)) + 1;
+    if (b - a >= 2) { tokView = { start: a, end: b }; tokRender(Math.max(a, Math.min(b - 1, tokFocus))); }
+    return;
+  }
+  tokPin = true;
+  tokFocus = tokXIdx(x);
+  tokMoveHl(); tokReadout();
+}
+function tokLeave() { hideTip(); }
+function tokDbl(ev) {
+  if (!tokState) return;
+  const m = tokState.apiMsgs[tokXIdx(tokEvX(ev))];
+  if (m?.rec != null) jumpTo(m.rec);
+}
+// ---- Minimap gestures: click pans a same-width window · drag selects a new range ----
+const tokMiniIdx = x => Math.max(0, Math.min(tokState.N - 1, Math.floor((x - tokState.padL) / tokState.plotW * tokState.N)));
+function tokMiniDown(ev) {
+  if (!tokState) return;
+  ev.currentTarget.setPointerCapture(ev.pointerId);
+  tokMiniDrag = { x0: tokEvX(ev), moved: false };
+}
+function tokMiniMove(ev) {
+  if (!tokState || !tokMiniDrag) return;
+  const x = tokEvX(ev);
+  if (Math.abs(x - tokMiniDrag.x0) > 4) tokMiniDrag.moved = true;
+  if (tokMiniDrag.moved) {
+    const win = document.getElementById('tok-mwin');
+    const a = Math.min(tokMiniDrag.x0, x), b = Math.max(tokMiniDrag.x0, x);
+    if (win) { win.setAttribute('x', a.toFixed(1)); win.setAttribute('width', Math.max(b - a, 2).toFixed(1)); }
+  }
+}
+function tokMiniUp(ev) {
+  if (!tokState || !tokMiniDrag) return;
+  const x = tokEvX(ev), moved = tokMiniDrag.moved, x0 = tokMiniDrag.x0;
+  tokMiniDrag = null;
+  if (moved) {
+    const a = tokMiniIdx(Math.min(x0, x)), b = tokMiniIdx(Math.max(x0, x)) + 1;
+    if (b - a >= 2) tokView = { start: a, end: b };
+  } else if (tokView) {   // click = pan the same-width window to the click point
+    const len = tokView.end - tokView.start, c = tokMiniIdx(x);
+    const start = Math.max(0, Math.min(tokState.N - len, c - (len >> 1)));
+    tokView = { start, end: start + len };
+  }
+  if (tokView) tokRender(Math.max(tokView.start, Math.min(tokView.end - 1, tokFocus)));
+  else tokRender(tokFocus);
+}
+function tokResetZoom() {
+  tokView = null;
+  if (tokState) tokRender(tokFocus);
+}
+function tokUnpin() {
+  tokPin = false;
+  tokReadout();
+}
+function tokKey(ev) {
+  if (!tokState) return;
+  if (ev.key === 'Escape') {
+    ev.preventDefault();
+    if (tokView) tokResetZoom(); else tokUnpin();
+  } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight') {
+    ev.preventDefault();
+    tokPin = true;
+    const f = Math.max(0, Math.min(tokState.N - 1, tokFocus + (ev.key === 'ArrowLeft' ? -1 : 1)));
+    if (tokView && (f < tokView.start || f >= tokView.end)) {   // when the focus leaves the range, pan the window by one step
+      const d = f < tokView.start ? -1 : 1;
+      if (tokView.start + d >= 0 && tokView.end + d <= tokState.N) { tokView.start += d; tokView.end += d; }
+      tokRender(f);
+      return;
+    }
+    tokFocus = f; tokMoveHl(); tokReadout();
+  } else if (ev.key === 'Enter') {
+    const m = tokState.apiMsgs[tokFocus];
+    if (m?.rec != null) jumpTo(m.rec);
+  }
+}
+window.addEventListener('resize', () => { clearTimeout(tokResizeT); tokResizeT = setTimeout(() => { if (tokState) renderTokenChart(tokState.apiMsgs); }, 160); });
+
+// each turn_duration record closes a segment of the file; within it, decompose wall time into
+// model inference (gap before each API message's first record, incl. retry waits) vs tool
+// execution (tool_use → tool_result). Parallel tools can overlap, so it's an approximation.
+function renderTurnChart(turnDurs) {
+  const el = $('chart-turns');
+  if (!turnDurs.length) { el.innerHTML = '<div class="empty-note">No turn duration records yet.</div>'; return; }
+  const max = Math.max(...turnDurs.map(r => r.durationMs), 1);
+  let prevEnd = -1;
+  const rows = turnDurs.map((td, i) => {
+    let modelMs = 0, toolMs = 0;
+    for (let j = prevEnd + 1; j <= td._i && j < records.length; j++) {
+      const r = records[j];
+      if (r._dup != null) continue;
+      if (r.type === 'assistant' && r.message?.id && msgFirst[r.message.id] === r._i && r._i > 0) {
+        const prev = records[r._i - 1];
+        if (prev?.timestamp && r.timestamp) {
+          const d = +new Date(r.timestamp) - +new Date(prev.timestamp);
+          if (d > 0) modelMs += d;
+        }
+      }
+      if (r._cat === 'tool-use') {
+        const b = (r.message?.content || []).find(x => x.type === 'tool_use' || x.type === 'server_tool_use');
+        const res = b && resultByToolId[b.id];
+        if (res?.timestamp && r.timestamp) {
+          const d = +new Date(res.timestamp) - +new Date(r.timestamp);
+          if (d > 0) toolMs += d;
+        }
+      }
+    }
+    prevEnd = td._i;
+    const other = Math.max(0, td.durationMs - modelMs - toolMs);
+    return { td, i, modelMs, toolMs, other };
+  });
+  el.innerHTML = rows.map(({ td, i, modelMs, toolMs, other }) => {
+    const sum = Math.max(modelMs + toolMs + other, 1);
+    return `
+    <div class="hbar-row" title="turn ${i+1} · starts ${fmtTime(td.timestamp)} · total ${fmtDur(td.durationMs)} — model ${fmtDur(modelMs)} · tools ${fmtDur(toolMs)}${other ? ` · other ${fmtDur(other)}` : ''} (approx; parallel tools overlap)">
+      <div class="tnum">${i+1}</div>
+      <div class="hbar-track tall">
+        <div class="hbar-fill" style="width:${(td.durationMs/max*100).toFixed(1)}%;background:transparent;display:flex;overflow:hidden">
+          <span style="flex:${modelMs} 1 0;background:var(--assistant-fill)"></span>
+          <span style="flex:${toolMs} 1 0;background:var(--tool-fill)"></span>
+          <span style="flex:${other} 1 0;background:var(--meta-fill);opacity:0.45"></span>
+        </div>
+        <span class="bar-text">${fmtDur(td.durationMs)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---------- interactions ----------
+// Persist the charts-section collapse preference; on expand, re-render the token chart once (clientWidth was 0 while hidden, so the width was the fallback value)
+function chartsToggle(el) {
+  try { localStorage.setItem('cv-charts', el.open ? 'open' : 'closed'); } catch (e) {}
+  if (el.open && tokState) renderTokenChart(tokState.apiMsgs);
+}
+try { if (localStorage.getItem('cv-charts') === 'closed') $('charts-sec').removeAttribute('open'); } catch (e) {}
+
+let pendingMsgJump = (/[#&]msg=([^&]+)/.exec(location.hash) || [])[1] || null;
+function tryMsgJump() {
+  if (!pendingMsgJump) return;
+  const i = msgFirst[decodeURIComponent(pendingMsgJump)];
+  if (i == null) return;
+  pendingMsgJump = null;
+  jumpTo(i);
+  const el = document.getElementById('rec-' + i);
+  if (el) { el.classList.add('msg-target'); setTimeout(() => el.classList.remove('msg-target'), 2400); }
+}
+
+function jumpTo(i) {
+  if (viewMode === 'thread' && records[i]?._dup != null) i = records[i]._dup;  // dups only exist in raw view
+  let el = document.getElementById('rec-' + i);
+  if (!el && viewMode === 'thread') { revealRecord(i); el = document.getElementById('rec-' + i); }  // target on a collapsed branch
+  if (!el) return;
+  if (el.classList.contains('hidden')) {
+    catOf(el.dataset.cat).on = true;
+    syncChips(); applyFilters();
+  }
+  // smooth-scroll time grows with distance, so far jumps feel slow — snap instantly when far,
+  // animate only short hops (within ~2 viewports) where the motion aids orientation.
+  const dist = Math.abs(el.getBoundingClientRect().top - window.innerHeight / 2);
+  el.scrollIntoView({ behavior: dist > window.innerHeight * 2 ? 'auto' : 'smooth', block: 'center' });
+  el.style.outline = '2px solid var(--accent)';
+  setTimeout(() => el.style.outline = '', 1600);
+}
+function syncChips() {
+  const chips = $('chips');
+  chips.innerHTML = Object.entries(CATS).map(([k, c]) => {
+    const n = records.filter(r => r._cat === k).length;
+    return `<span class="chip ${c.on?'on':''}" style="--chipc:${c.color}" data-cat="${k}">${c.label}<span class="n">${n}</span></span>`;
+  }).join('');
+  chips.querySelectorAll('.chip').forEach(ch => ch.onclick = () => {
+    CATS[ch.dataset.cat].on = !CATS[ch.dataset.cat].on;
+    syncChips(); applyFilters();
+  });
+}
+function applyFilters() {
+  const q = $('search').value.trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#feed .felem').forEach(el => {
+    const r = records[+el.dataset.i];
+    if (!r) return;
+    let show = catOf(r._cat).on;
+    if (show && q) show = JSON.stringify(stripPrivate(r)).toLowerCase().includes(q);
+    el.classList.toggle('hidden', !show);
+    if (show) shown++;
+  });
+  document.querySelectorAll('#feed .gap-marker, #feed .turnsep').forEach(g => g.classList.toggle('hidden', !!q));
+  const hidden = +($('feed').dataset.hidden || 0);
+  $('count-note').textContent = `${shown} of ${records.length} records shown` +
+    (hidden && !q ? ` · ${hidden} on other branches` : '');
+}
+$('search').addEventListener('input', applyFilters);
+
+$('viewtoggle').querySelectorAll('button').forEach(b => b.onclick = () => {
+  if (viewMode === b.dataset.m) return;
+  viewMode = b.dataset.m;
+  $('viewtoggle').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.m === viewMode));
+  renderFeed();
+  applyFilters();
+});
+
+function setStatus(ok, text) {
+  $('dot').className = 'live-dot' + (ok ? ' pulse' : ' off');
+  $('status-text').textContent = text;
+}
+
+// ask the local server to open / reveal the underlying .jsonl in the OS
+async function fileAction(kind, btn, label) {
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  try {
+    const resp = await fetch(`/__viewer/${kind}?path=${encodeURIComponent(P)}`);
+    const j = await resp.json().catch(() => ({}));
+    if (!resp.ok || j.error) throw new Error(j.error || ('HTTP ' + resp.status));
+    btn.innerHTML = (kind === 'reveal' ? 'revealed ' : 'opened ') + icon('check', 11);
+  } catch (e) {
+    btn.innerHTML = 'failed: ' + e.message;
+  }
+  setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1800);
+}
+
+// ---------- boot: embedded snapshot or live polling ----------
+const embedEl = document.getElementById('session-data');
+if (embedEl) {
+  $('view-switch').style.display = 'none';
+  $('dot').classList.remove('pulse');
+  ingest(JSON.parse(embedEl.textContent));
+  $('status-text').textContent = 'static snapshot · ' + records.length + ' records';
+} else if (P) {
+  // a subagent transcript path embeds its parent's: <parent-stem>/subagents/agent-*.jsonl
+  const pm = /^(.*)\/subagents\/[^/]+\.jsonl$/.exec(P);
+  if (pm) {
+    $('up-link').href = '/transcripts/viewer?path=' + encodeURIComponent(pm[1] + '.jsonl');
+    $('up-link').style.display = '';
+  }
+  $('export-btn').style.display = '';
+  $('export-btn').href = '/__viewer/export?path=' + encodeURIComponent(P);
+  $('open-btn').style.display = '';
+  $('reveal-btn').style.display = '';
+  $('open-btn').onclick = () => fileAction('open', $('open-btn'), 'open .jsonl');
+  $('reveal-btn').onclick = () => fileAction('reveal', $('reveal-btn'), 'reveal');
+  recompute(); syncChips(); applyFilters();
+  refreshHooks(true); // hook event-layer annotations (measured tool duration/approval waits/failures); low-frequency fallback while idle
+  setInterval(() => refreshHooks(true), 60000);
+  fetch('/__viewer/meta?path=' + encodeURIComponent(P)).then(r => r.ok ? r.json() : null)
+    .then(m => {
+      if (!m || m.error) return;
+      serverMeta = m; recompute();
+      // Cross-layer connectivity: if the API dashboard captured this session, show the jump entry point
+      if (m.sessionId) fetch('/__lens/overview').then(r => r.ok ? r.json() : null).then(o => {
+        if (o && (o.sessions || []).some(x => x.id === m.sessionId)) {
+          $('vs-api').href = '/#s=' + encodeURIComponent(m.sessionId);
+          $('vs-api').title = 'API view — jump straight to the request lineage of this session';
+          apiSid = m.sessionId;
+          renderFeed(); // backfill per-message API deep-link badges on already-rendered rows
+        }
+      }).catch(() => {});
+    }).catch(() => {});
+  (async function poll() {
+    try {
+      const resp = await fetch(`/__viewer/tail?path=${encodeURIComponent(P)}&offset=${byteOffset}`);
+      if (resp.status === 404) { setStatus(false, 'transcript not found at this path'); return; }
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const j = await resp.json();
+      if (j.truncated) { location.reload(); return; }
+      byteOffset = j.offset;
+      if (j.lines.length) {
+        ingest(j.lines.map(l => { try { return JSON.parse(l); } catch (e) { return {type:'parse-error', raw:l}; } }));
+        refreshHooks(); // new records arrived → a tool most likely just finished; follow up on hook pairing (5s throttle)
+      }
+      setStatus(true, `live · ${records.length} records · updated ${new Date().toLocaleTimeString('en-GB')}`);
+    } catch (e) {
+      setStatus(false, 'server unreachable — retrying…');
+    }
+    setTimeout(poll, 1500);
+  })();
+} else {
+  document.body.innerHTML = '<div class="wrap">Missing <code>?path=</code> query parameter. <a href="/transcripts">all sessions</a></div>';
+}
+</script>
+<div id="tooltip"></div>
+</body>
+</html>

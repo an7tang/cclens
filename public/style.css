@@ -1,0 +1,980 @@
+/* cclens dashboard styles — palette taken from a validated reference implementation (light/dark modes) */
+
+:root {
+  --surface-1: #fcfcfb;        /* chart/card surface */
+  --page: #f9f9f7;             /* page background */
+  --ink-1: #0b0b0b;
+  --ink-2: #52514e;
+  --ink-3: #898781;            /* axes / secondary annotations */
+  --grid: #e1e0d9;             /* hairline gridlines */
+  --baseline: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --good-text: #006300;
+
+  --s1: #2a78d6;  /* blue    */
+  --s2: #1baf7a;  /* aqua    */
+  --s3: #eda100;  /* yellow  */
+  --s4: #008300;  /* green   */
+  --s5: #4a3aa7;  /* violet  */
+  --s6: #e34948;  /* red     */
+  --s7: #e87ba4;  /* magenta */
+  --s8: #eb6834;  /* orange  */
+  --critical: #d03b3b;
+  --warning: #fab219;
+
+  /* Context-composition encoding: repeated cache reads recede on gray; new content gets blue emphasis */
+  --ctx-cache-read: #c9c7bf;
+  --ctx-cache-write: #86b6ef;  /* blue-250 */
+  --ctx-fresh: #256abf;        /* blue-500 */
+  --ctx-output: #1baf7a;       /* aqua */
+
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+
+  /* Unified surface for message content containers (shared by md render box / pre / tool-param box, reducing the number of coexisting container styles) */
+  --content-bg: color-mix(in srgb, var(--ink-1) 2.5%, transparent);
+  --content-edge: color-mix(in srgb, var(--ink-1) 6%, transparent);
+
+  /* JSON syntax highlighting (Primer-style palette) */
+  --json-key: #0550ae; --json-str: #0a3069; --json-num: #953800; --json-kw: #cf222e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --ink-1: #ffffff;
+    --ink-2: #c3c2b7;
+    --ink-3: #898781;
+    --grid: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+    --good-text: #0ca30c;
+
+    --s1: #3987e5;
+    --s2: #199e70;
+    --s3: #c98500;
+    --s4: #008300;
+    --s5: #9085e9;
+    --s6: #e66767;
+    --s7: #d55181;
+    --s8: #d95926;
+    --critical: #d03b3b;
+    --warning: #fab219;
+
+    --ctx-cache-read: #3a3a37;
+    --ctx-cache-write: #2a78d6;
+    --ctx-fresh: #86b6ef;
+    --ctx-output: #199e70;
+
+    --json-key: #79c0ff; --json-str: #a5d6ff; --json-num: #ffa657; --json-kw: #ff7b72;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--ink-1);
+  background: var(--page);
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- Layout */
+
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+header.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+  flex: 0 0 auto;
+}
+header.topbar h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+header.topbar h1 span { color: var(--ink-3); font-weight: 400; }
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--ink-3); flex: 0 0 auto;
+}
+.live-dot.on { background: var(--s2); }
+.topbar-meta { margin-left: auto; color: var(--ink-3); font-size: 12px; display: flex; gap: 16px; align-items: center; }
+.topbar-meta b { color: var(--ink-2); font-weight: 600; }
+
+/* ---- View switcher (top-left; the API ↔ transcript observation layers; switching preserves session context) ----
+   Segmented control: recessed track + raised active item — control language, kept separate from data labels (washed-background annotations) */
+.view-switch {
+  display: flex; align-items: center; gap: 2px;
+  padding: 2px; border: 1px solid var(--border); border-radius: 8px;
+  background: color-mix(in srgb, var(--ink-1) 3.5%, transparent);
+  flex: 0 0 auto;
+}
+.view-switch a {
+  padding: 2px 12px; border-radius: 6px; font-size: 12.5px; font-weight: 500;
+  color: var(--ink-3); text-decoration: none; line-height: 18px; white-space: nowrap;
+}
+.view-switch a:hover { color: var(--ink-1); }
+.view-switch a.active {
+  color: var(--ink-1); background: var(--surface-1);
+  box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgba(0,0,0,.06);
+}
+
+/* Cross-layer deep link on the detail page (transcript ↗) */
+.nav-link {
+  color: var(--ink-2); text-decoration: none; font-weight: 500;
+  padding: 3px 9px; border: 1px solid var(--border); border-radius: 6px;
+}
+.nav-link:hover { background: color-mix(in srgb, currentColor 6%, transparent); }
+
+/* ---- Full-text search ---- */
+.search-wrap { position: relative; margin-left: 8px; display: flex; align-items: center; }
+.search-icon {
+  position: absolute; left: 9px; width: 13px; height: 13px;
+  color: var(--ink-3); pointer-events: none;
+}
+.search-wrap:focus-within .search-icon { color: var(--ink-2); }
+#search {
+  font: inherit; font-size: 12px; color: var(--ink-1);
+  background: color-mix(in srgb, var(--ink-1) 4%, transparent);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 4px 34px 4px 28px; width: 220px; outline: none;
+  transition: width .18s ease, border-color .15s ease, background-color .15s ease;
+}
+#search:focus { border-color: color-mix(in srgb, var(--s1) 50%, transparent); background: var(--surface-1); width: 320px; }
+#search::placeholder { color: var(--ink-3); }
+#search::-webkit-search-cancel-button { -webkit-appearance: none; } /* the native ✕ crowds the keycap hint; remove it */
+/* Shortcut keycap: idle hint / focused; swaps to an esc hint on focus (the way in also tells you the way out) */
+.search-key {
+  position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+  font-family: var(--mono); font-size: 10px; line-height: 1;
+  color: var(--ink-3); background: var(--surface-1);
+  border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px;
+  padding: 2.5px 5px; pointer-events: none;
+}
+.search-key::before { content: '/'; }
+.search-wrap:focus-within .search-key::before { content: 'esc'; }
+#search-results {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+  width: 560px; max-width: calc(100vw - 40px); max-height: 60vh; overflow-y: auto;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0,0,0,.22); padding: 6px;
+}
+.sr-head { font-size: 10.5px; color: var(--ink-3); padding: 4px 8px 6px; }
+.sr-empty { font-size: 12px; color: var(--ink-3); padding: 10px 8px; }
+.sr-row { padding: 6px 8px; border-radius: 7px; cursor: pointer; }
+.sr-row:hover { background: color-mix(in srgb, var(--ink-1) 5%, transparent); }
+.sr-row.active { background: color-mix(in srgb, var(--s1) 10%, transparent); }
+.sr-meta { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--ink-3); }
+.sr-meta .model-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.sr-sess { font-weight: 600; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.sr-when { margin-left: auto; font-variant-numeric: tabular-nums; }
+.sr-snippet {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-2); margin-top: 3px;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  word-break: break-all; line-height: 1.5;
+}
+.sr-snippet mark {
+  background: color-mix(in srgb, var(--s3) 35%, transparent);
+  color: var(--ink-1); border-radius: 2px; padding: 0 1px;
+}
+
+/* Version-handshake banner: server process is older than the page (amber = anomaly semantic color) */
+#stale-banner {
+  position: fixed; top: 46px; left: 50%; transform: translateX(-50%); z-index: 80;
+  display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 24px);
+  background: color-mix(in srgb, var(--s3) 12%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--s3) 45%, transparent);
+  color: var(--ink-1); border-radius: 9px; padding: 7px 12px; font-size: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.15);
+}
+#stale-banner code {
+  font-family: var(--mono); font-size: 11px;
+  background: color-mix(in srgb, var(--ink-1) 7%, transparent);
+  padding: 1px 5px; border-radius: 4px; white-space: nowrap;
+}
+#stale-banner .btn { flex: 0 0 auto; white-space: nowrap; }
+
+main { flex: 1 1 auto; display: flex; min-height: 0; }
+
+/* Session sidebar */
+#sidebar {
+  width: 250px; flex: 0 0 auto;
+  border-right: 1px solid var(--border);
+  background: var(--surface-1);
+  overflow-y: auto;
+  padding: 8px;
+}
+#sidebar.collapsed {
+  width: 36px; padding: 8px 0; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+.side-toggle {
+  font: inherit; font-size: 12px; color: var(--ink-3);
+  background: transparent; border: 1px solid var(--border); border-radius: 6px;
+  width: 24px; height: 24px; padding: 0; cursor: pointer; flex: 0 0 auto;
+}
+.side-toggle:hover { color: var(--ink-1); background: color-mix(in srgb, var(--ink-1) 5%, transparent); }
+.side-act { animation: act-pulse 1.6s ease-in-out infinite; width: 7px; height: 7px; border-radius: 50%; background: var(--s2); }
+.sidebar-title {
+  font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .6px;
+  padding: 6px 8px 4px; display: flex; align-items: center; justify-content: space-between;
+}
+.session-card .slabel {
+  font-size: 12px; font-weight: 600; color: var(--ink-1);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: flex; align-items: center; gap: 5px;
+}
+.session-card .act {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--s2); flex: 0 0 auto;
+  animation: act-pulse 1.6s ease-in-out infinite;
+}
+@keyframes act-pulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+.session-card {
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid transparent; margin-bottom: 4px;
+}
+.session-card:hover { background: color-mix(in srgb, var(--ink-1) 4%, transparent); }
+.session-card.active { border-color: var(--border); background: color-mix(in srgb, var(--s1) 8%, transparent); }
+.session-card .smeta {
+  color: var(--ink-3); font-size: 11px; margin-top: 3px;
+  display: flex; gap: 8px; align-items: center; white-space: nowrap;
+}
+.smeta .m-pend { color: var(--s2); }
+.smeta .m-err { color: var(--critical); }
+.smeta .m-err-soft { color: var(--ink-3); }
+.session-card.dim { opacity: .55; }
+.session-card.dim:hover, .session-card.dim.active { opacity: 1; }
+.smeta .m-when { margin-left: auto; font-variant-numeric: tabular-nums; }
+.smeta .mdots { display: inline-flex; gap: 3px; align-items: center; flex: 0 0 auto; }
+.smeta .mdots i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.empty-hint { color: var(--ink-3); padding: 24px 12px; line-height: 1.7; }
+.empty-hint code { font-family: var(--mono); font-size: 11px; background: color-mix(in srgb, var(--ink-1) 6%, transparent); padding: 1px 5px; border-radius: 4px; }
+
+/* Main content */
+#content { flex: 1 1 auto; display: flex; min-width: 0; position: relative; }
+#session-pane {
+  --pane-pt: 14px; /* top padding as a variable: sticky turn headers use a negative offset to hug the pane's true top edge */
+  flex: 1 1 55%; min-width: 0; overflow-y: auto; padding: var(--pane-pt) 16px;
+  container-type: inline-size;
+}
+#detail-pane {
+  flex: 1 1 45%; min-width: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface-1);
+  overflow-y: auto;
+  display: none;
+  container-type: inline-size;
+}
+#detail-pane.open { display: block; }
+
+/* Two-pane split: with detail open, list width = a draggable variable (--split / --split-rail, written by the drag handle, remembered in localStorage);
+   the outer clamp guarantees each pane's minimum readable width, following proportionally on window resize */
+#content:has(#detail-pane.open) #session-pane {
+  flex: 0 0 clamp(220px, var(--split, 55%), calc(100% - 360px));
+}
+#content:has(#detail-pane.open) #detail-pane { flex: 1 1 auto; }
+
+/* Narrow content area (half-screen side-by-side terminal is the primary use case): clicking between requests is the core workflow, so the list must always stay visible and clickable.
+   With detail open the list compresses into a "nav rail" — the description stays (tool name/user input); metric columns yield via container query */
+#content.narrow:has(#detail-pane.open) #session-pane {
+  flex: 0 0 clamp(232px, var(--split-rail, 36%), calc(100% - 300px));
+}
+
+/* Pane split handle: a 7px grab zone riding on the detail pane's left border, taking no layout width; shows a hint line on hover/drag */
+#split-handle { display: none; flex: 0 0 7px; margin: 0 -3px 0 -4px; z-index: 6; cursor: col-resize; position: relative; }
+#content:has(#detail-pane.open) #split-handle { display: block; }
+#split-handle::after { content: ''; position: absolute; left: 3px; top: 0; bottom: 0; width: 1px; background: transparent; }
+#split-handle:hover::after, #split-handle.dragging::after { background: var(--s1); width: 2px; left: 2.5px; }
+body.splitting { cursor: col-resize; user-select: none; }
+
+/* ---------------------------------------------------------------- Stat tiles */
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.tile {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px;
+}
+.tile .tl { font-size: 11px; color: var(--ink-3); }
+.tile .tv { font-size: 20px; font-weight: 650; margin-top: 2px; }
+.tile .td { font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+.tile .td .up { color: var(--good-text); }
+
+/* ---------------------------------------------------------------- Cards and charts */
+
+.card {
+  --card-px: 14px; /* horizontal padding as a variable: turn section headers use it to bleed to the card edge */
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px var(--card-px); margin-bottom: 14px;
+}
+.card h2 { font-size: 13px; font-weight: 650; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+.card h2 .sub { color: var(--ink-3); font-weight: 400; font-size: 12px; }
+.card h2 .spacer { flex: 1; }
+.card .legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 6px 0 8px; font-size: 11px; color: var(--ink-2); }
+.legend .key { display: inline-flex; align-items: center; gap: 5px; }
+.legend .key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.legend .key i.line { height: 2px; width: 14px; border-radius: 1px; }
+
+.chart-wrap { position: relative; }
+svg.chart { display: block; width: 100%; }
+/* NOTE: this fill beats any fill="…" presentation attribute on descendant <text> (class selector vs attribute).
+   Per-element text colour must therefore be delivered as an inline style — see hook-span-label in app.js. */
+svg.chart text { font-family: var(--sans); fill: var(--ink-3); font-size: 10px; font-variant-numeric: tabular-nums; }
+svg.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+svg.chart .axisline { stroke: var(--baseline); stroke-width: 1; }
+svg.chart .lane-label { fill: var(--ink-2); font-size: 10px; }
+svg.chart .bar { cursor: pointer; }
+svg.chart .bar:hover { filter: brightness(1.12); }
+svg.chart .tbar { cursor: pointer; }
+svg.chart .tbar:hover { filter: brightness(1.15); }
+
+/* Visual-language separation between controls and data labels:
+   buttons = outline + solid fill + hover darkening + press feedback (clickable things are "raised solids");
+   data labels (.chip/.rel/.btag) = borderless washed-background annotations that don't respond to hover.
+   Tell "what's clickable" at a glance, without trying each one. */
+.btn {
+  font: inherit; font-size: 11px; font-weight: 500; color: var(--ink-2);
+  background: color-mix(in srgb, var(--ink-1) 5%, transparent);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 9px; cursor: pointer;
+  transition: background-color .12s ease, color .12s ease;
+}
+.btn:hover { background: color-mix(in srgb, var(--ink-1) 10%, transparent); color: var(--ink-1); }
+.btn:active { background: color-mix(in srgb, var(--ink-1) 15%, transparent); }
+.btn:focus-visible { outline: 2px solid color-mix(in srgb, var(--s1) 55%, transparent); outline-offset: 1px; }
+.btn.on { background: color-mix(in srgb, var(--s1) 13%, transparent); border-color: color-mix(in srgb, var(--s1) 42%, transparent); color: var(--ink-1); }
+
+/* tooltip */
+#tooltip {
+  position: fixed; z-index: 50; pointer-events: none; display: none;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.18);
+  padding: 8px 10px; font-size: 11px; min-width: 150px; max-width: 320px;
+}
+#tooltip .tt-title { font-weight: 650; color: var(--ink-1); margin-bottom: 4px; font-size: 11px; }
+#tooltip .tt-row { display: flex; align-items: center; gap: 6px; margin: 2px 0; color: var(--ink-2); }
+#tooltip .tt-row .k { width: 14px; height: 2px; border-radius: 1px; flex: 0 0 auto; }
+#tooltip .tt-row b { color: var(--ink-1); font-variant-numeric: tabular-nums; margin-left: auto; padding-left: 12px; }
+
+/* JSON syntax highlighting tokens (produced by jsonHiPre; container styling follows each context's pre rules) */
+pre.json-hl .jk { color: var(--json-key); }
+pre.json-hl .js { color: var(--json-str); }
+pre.json-hl .jn { color: var(--json-num); }
+pre.json-hl .jb { color: var(--json-kw); }
+
+/* Chart data-table view */
+table.data-table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 4px; }
+table.data-table th { text-align: right; color: var(--ink-3); font-weight: 500; padding: 4px 8px; border-bottom: 1px solid var(--grid); }
+table.data-table th:first-child, table.data-table td:first-child { text-align: left; }
+table.data-table td { text-align: right; padding: 3px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; color: var(--ink-2); }
+
+/* ---------------------------------------------------------------- Lineage list */
+
+/* First-principles design of a lineage row: one row = one step of "what happened".
+   Left is identity and content (seq · model dot · [anomaly badge] · description); right is two fixed metric groups
+   (context-composition bar + value = replay mechanics, and duration). The default case is quiet; only anomalies get badges.
+   From full width down to the nav rail, one shared layout: the middle desc flex-truncates; the metric columns hide as a whole only at the nav-rail tier. */
+.lineage { margin: 0; padding: 0; list-style: none; }
+.lineage li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 8px; cursor: pointer;
+  border: 1px solid transparent;
+  scroll-margin-top: 34px; /* keep upward keyboard-nav scrolling from sliding under the sticky turn header */
+}
+.lineage li:hover { background: color-mix(in srgb, var(--ink-1) 4%, transparent); }
+.lineage li.selected { border-color: var(--border); background: color-mix(in srgb, var(--s1) 8%, transparent); }
+.lineage .seq { font-family: var(--mono); font-size: 11px; color: var(--ink-3); width: 30px; flex: 0 0 auto; text-align: right; }
+.lineage .model-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.lineage .rel {
+  flex: 0 0 auto; font-size: 10px; padding: 1.5px 6px; border-radius: 4px;
+  background: color-mix(in srgb, var(--ink-1) 6%, transparent);
+  color: var(--ink-2); white-space: nowrap;
+}
+/* Badge semantic colors (decoupled from model hues): amber = wire anomaly (retry/history rewrite/cache break), neutral = structural info (origin/branch/auxiliary).
+   Within a row, colored dots mean model only and badge colors mean semantics only. Borderless washed background — an annotation, not a button */
+.lineage .rel.retry, .lineage .rel.compact, .lineage .rel.rewrite, .lineage .rel.resend {
+  color: color-mix(in srgb, var(--s3) 78%, var(--ink-1));
+  background: color-mix(in srgb, var(--s3) 13%, transparent);
+}
+.lineage .desc { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-size: 12px; }
+.lineage .desc .w-quote { color: var(--ink-1); }
+.lineage .desc .w-dim { color: var(--ink-3); }
+.lineage .ctxbar { flex: 0 1 110px; min-width: 36px; display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: color-mix(in srgb, var(--ink-1) 5%, transparent); }
+.lineage .ctxbar i { display: block; height: 100%; }
+.lineage .tok { flex: 0 0 44px; text-align: right; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lineage .dur { flex: 0 0 52px; text-align: right; font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lineage .err { color: var(--critical); font-weight: 600; font-size: 11px; flex: 0 0 auto; }
+.lineage li.pending { opacity: .55; }
+.lineage li.pending .dur::after { content: '…'; }
+
+/* ---------------------------------------------------------------- Detail pane */
+
+.detail-head { padding: 12px 16px 0; }
+.detail-head .row1 { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; }
+.detail-head h3 { margin: 0; font-size: 14px; font-weight: 650; }
+.detail-head .close { margin-left: auto; }
+.detail-head .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 8px 0; font-size: 11px; color: var(--ink-2); }
+.detail-head .meta b { color: var(--ink-1); font-variant-numeric: tabular-nums; }
+/* Info chip: borderless washed background — an annotation attached to the title, not a control */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; padding: 2px 8px; border-radius: 5px;
+  background: color-mix(in srgb, var(--ink-1) 4.5%, transparent);
+  color: var(--ink-2);
+}
+.chip .model-dot { width: 7px; height: 7px; border-radius: 50%; }
+.chip.err { color: var(--critical); background: color-mix(in srgb, var(--critical) 9%, transparent); }
+
+.mini-usage { display: flex; gap: 8px; margin: 8px 0 4px; flex-wrap: wrap; }
+/* Usage mini-boxes are data, not controls: they use the content-container surface language (washed background + same-hue edge), distinct from buttons' outlined solids */
+.mini-usage .mu { background: var(--content-bg); border: 1px solid var(--content-edge); border-radius: 8px; padding: 5px 10px; }
+.mini-usage .mu .l { font-size: 10px; color: var(--ink-3); display: flex; align-items: center; gap: 4px; }
+.mini-usage .mu .l i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+.mini-usage .mu .v { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+.relation-note {
+  margin: 8px 0; padding: 7px 10px; border-radius: 8px; font-size: 12px;
+  background: color-mix(in srgb, var(--s1) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--s1) 22%, transparent);
+  color: var(--ink-2);
+}
+.relation-note b { color: var(--ink-1); }
+.relation-note a { color: var(--s1); cursor: pointer; text-decoration: none; }
+
+/* Hooks bill (detail page): attribution summary only — the raw event record is handed off to the lineage narrative rows */
+.hooks-gap {
+  margin: 8px 0; border: 1px solid var(--border); border-radius: 8px;
+  background: color-mix(in srgb, var(--ink-1) 2.5%, transparent);
+  font-size: 12px; overflow: hidden;
+}
+.hooks-gap .hg-head {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 6px 10px; color: var(--ink-2);
+  background: var(--surface-1); cursor: default;
+}
+.hooks-gap .hg-head b { color: var(--ink-1); font-variant-numeric: tabular-nums; }
+.hooks-gap .hg-chip { padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hooks-gap .hg-chip.wait { color: color-mix(in srgb, var(--s1) 75%, var(--ink-1)); background: color-mix(in srgb, var(--s1) 12%, transparent); }
+.hooks-gap .hg-chip.exec { color: color-mix(in srgb, var(--s8) 75%, var(--ink-1)); background: color-mix(in srgb, var(--s8) 12%, transparent); }
+.hooks-gap .hg-chip.rest { color: var(--ink-2); background: color-mix(in srgb, var(--ink-1) 6%, transparent); }
+.hooks-gap .hg-conc-note { color: var(--ink-3); }
+/* Breakdown bar: 100% segmentation of the gap — waiting striped blue / exec orange / failure red / residual gray */
+.hooks-gap .hg-bill-bar {
+  display: flex; height: 10px; margin: 0 10px 6px; border-radius: 3px; overflow: hidden;
+  background: color-mix(in srgb, var(--ink-1) 5%, transparent);
+}
+.hooks-gap .hg-bill-bar i { display: block; height: 100%; }
+.hooks-gap .hg-bill-bar .seg-wait {
+  background: repeating-linear-gradient(45deg,
+    color-mix(in srgb, var(--s1) 14%, var(--surface-1)) 0 3px, var(--s1) 3px 4px);
+}
+.hooks-gap .hg-bill-bar .seg-exec { background: var(--s8); }
+.hooks-gap .hg-bill-bar .seg-exec + .seg-exec { border-left: 1px solid var(--surface-1); }
+.hooks-gap .hg-bill-bar .seg-fail { background: var(--critical); }
+.hooks-gap .hg-bill-bar .seg-rest { background: var(--baseline); }
+/* Per-tool summary chips */
+.hooks-gap .hg-tools { display: flex; flex-wrap: wrap; gap: 4px 6px; padding: 0 10px 8px; }
+.hooks-gap .hg-tool-chip {
+  font-family: var(--mono); font-size: 11px; font-variant-numeric: tabular-nums;
+  padding: 0 6px; border-radius: 4px; color: var(--ink-2);
+  background: color-mix(in srgb, var(--ink-1) 4.5%, transparent);
+}
+.hooks-gap .hg-tool-chip.fail { color: var(--critical); background: color-mix(in srgb, var(--critical) 9%, transparent); }
+
+/* Hooks strip legend row (inside the timeline card): category color dots + paired summary — the big picture lives on the timeline, not in an isolated board */
+.hooks-line { color: var(--ink-2); font-size: 12px; }
+.hooks-line b { color: var(--ink-1); font-variant-numeric: tabular-nums; }
+/* Recorder coverage-gap warning: for unregistered events, "not shown ≠ didn't happen" — this must be visible */
+.hk-cov-warn { color: color-mix(in srgb, var(--warning) 55%, var(--ink-1)); font-weight: 600; }
+/* Section headers for multiple records inside an expanded payload (an exec row = two real records, Pre+Post) */
+.hg-det-head { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); margin: 4px 0 2px; }
+.hg-det-head span { font-weight: 600; }
+
+/* ---- Hook narrative rows in the lineage (supporting layer) ----
+ * Visually a standalone "local event swimlane": a continuous left rail (adjacent rows' border-left joining into one vertical line)
+ * marks "these happened locally between two requests", so attribution never blends into the request rows above and below.
+ * Subordination is expressed without color: indented past the seq column, smaller monospace type, whole row at 78% opacity (restored on hover).
+ * Color has exactly one carrier: the real event name in its category color — the same palette as the timeline Hooks strip/legend, mutually recognizable across areas;
+ * tool names stay neutral, summaries dimmed, durations right-aligned to the request rows' duration column (scan along the same vertical line).
+ * Note: hook rows/expanded panels are .lineage li and inherit the request rows' flex layout genes —
+ * we must explicitly reset the full set of display/align/gap/padding/radius/cursor here; miss one and styles bleed. */
+.lineage li.hk-row {
+  display: flex; align-items: baseline; gap: 8px;
+  margin-left: 50px; padding: 0 8px 0 10px; line-height: 1.7;
+  border: none; border-left: 2px solid color-mix(in srgb, var(--ink-1) 11%, transparent);
+  border-radius: 0;
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  cursor: pointer;
+  opacity: .78;
+}
+.lineage li.hk-row:hover { background: color-mix(in srgb, var(--ink-1) 4%, transparent); opacity: 1; }
+/* Event-name column: real hook event names; a fixed width aligns common names into a column (long names like PostToolUseFailure extend naturally, never truncated) */
+.lineage .hk-ev { flex: 0 0 auto; min-width: 92px; }
+.lineage li.hk-row.hk-fail .hk-ev { font-weight: 650; }
+.lineage .hk-tool {
+  flex: 0 0 auto; font-weight: 500; color: var(--ink-2);
+  max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lineage .hk-sum { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lineage .hk-dur {
+  flex: 0 0 52px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2);
+}
+.lineage .hk-dur.fail { color: var(--critical); font-weight: 600; }
+.lineage .hk-time { flex: 0 0 auto; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lineage .hk-chip { flex: 0 0 auto; font-size: 10px; padding: 0 5px; border-radius: 4px; }
+.lineage .hk-chip.wait { color: color-mix(in srgb, var(--s1) 75%, var(--ink-1)); background: color-mix(in srgb, var(--s1) 10%, transparent); }
+/* No join evidence (interleaved by time only; may belong to a parallel agent): dimmed further + dashed marker */
+.lineage li.hk-row.hk-unjoined { opacity: .5; }
+.lineage li.hk-row.hk-unjoined:hover { opacity: .9; }
+.lineage .hk-mark {
+  flex: 0 0 auto; font-size: 10px; padding: 0 5px; border-radius: 4px;
+  color: var(--ink-3); border: 1px dashed color-mix(in srgb, var(--ink-1) 25%, transparent);
+}
+/* Payload box expanded from a narrative row (li form, non-interactive):
+ * must be explicitly display:block — inheriting the request rows' flex would lay the Pre+Post payload blocks out as side-by-side columns and overflow.
+ * Belongs to the same local swimlane (same left rail); the Pre/Post records stack vertically, each with an event-name section header. */
+.lineage li.hg-det {
+  display: block;
+  margin-left: 50px; padding: 4px 12px 8px; cursor: default;
+  border: none; border-left: 2px solid color-mix(in srgb, var(--ink-1) 11%, transparent);
+  border-radius: 0;
+}
+.lineage li.hg-det:hover { background: transparent; }
+.lineage li.hg-det pre { font-size: 11px; max-height: 300px; overflow: auto; margin: 0; }
+.lineage li.hg-det > * + .hg-det-head { margin-top: 8px; }
+
+.tabs {
+  display: flex; gap: 2px; padding: 0 16px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--surface-1); z-index: 5;
+  overflow-x: auto; scrollbar-width: none; /* narrow panes scroll horizontally rather than wrap/overflow */
+}
+.tabs::-webkit-scrollbar { display: none; }
+/* Tab styling applies only to real tabs — the "raw format" toggle in the bar is a control and uses the unified .btn language */
+.tabs button:not(.raw-toggle) {
+  font: inherit; font-size: 12px; padding: 8px 10px; border: none; background: none;
+  color: var(--ink-3); cursor: pointer; border-bottom: 2px solid transparent;
+  white-space: nowrap; flex: 0 0 auto;
+}
+.tabs button:not(.raw-toggle):hover { color: var(--ink-1); }
+.tabs button:not(.raw-toggle).on { color: var(--ink-1); border-bottom-color: var(--s1); font-weight: 600; }
+.tab-body { padding: 12px 16px 40px; }
+
+/* Message rendering */
+.collapse-shared {
+  border: 1px dashed var(--baseline); border-radius: 8px;
+  padding: 8px 12px; color: var(--ink-3); cursor: pointer; font-size: 12px;
+  margin-bottom: 8px; user-select: none;
+}
+.collapse-shared:hover { color: var(--ink-1); background: color-mix(in srgb, var(--ink-1) 4%, transparent); }
+
+.msg { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; }
+.msg.shared { opacity: .62; }
+.msg .msg-head {
+  display: flex; align-items: center; gap: 8px; padding: 6px 12px;
+  font-size: 11px; color: var(--ink-3);
+  background: color-mix(in srgb, var(--ink-1) 3%, transparent);
+}
+/* Role recognition: a very light hue wash on the header (low saturation, scannable across the whole row) + dot + label text color */
+.msg.role-user .msg-head { background: color-mix(in srgb, var(--s1) 7%, transparent); }
+.msg.role-assistant .msg-head { background: color-mix(in srgb, var(--s5) 7%, transparent); }
+.msg.role-system .msg-head { background: color-mix(in srgb, var(--s3) 8%, transparent); }
+.msg .msg-head .role { font-weight: 650; color: var(--ink-1); text-transform: uppercase; font-size: 10px; letter-spacing: .5px; }
+.msg .msg-head .role.user { color: var(--s1); }
+.msg .msg-head .role.assistant { color: var(--s5); }
+.msg .msg-head .role.system { color: color-mix(in srgb, var(--s3) 80%, var(--ink-1)); }
+.msg .msg-head .newtag { color: var(--s2); font-weight: 650; font-size: 10px; }
+.msg .msg-head .hash { font-family: var(--mono); font-size: 10px; margin-left: auto; }
+.msg .blocks { padding: 10px 12px; }
+
+.block { margin-bottom: 10px; }
+.block:last-child { margin-bottom: 0; }
+/* Block-type labels: plain text (no bordered pill, fewer fiddly little boxes); type is identified by text and hue */
+.block .btag {
+  display: inline-block; font-size: 10px; font-family: var(--mono);
+  color: var(--ink-3); margin-bottom: 4px; letter-spacing: .2px;
+}
+.block .btag.tool_use { color: var(--s8); }
+.block .btag.tool_result { color: var(--s2); }
+.block .btag.tool_result_error { color: var(--critical); }
+.block .btag.thinking { color: var(--s5); }
+.block pre {
+  margin: 0; font-family: var(--mono); font-size: 11px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; color: var(--ink-2);
+  background: var(--content-bg);
+  border: 1px solid var(--content-edge);
+  border-radius: 8px; padding: 8px 11px;
+  max-height: 300px; overflow: auto;
+}
+.block .clamp { max-height: 120px; overflow: hidden; position: relative; }
+.block .expand-btn { margin-top: 3px; }
+
+.cache-flag {
+  display: flex; align-items: center; gap: 6px; margin: 8px 0;
+  color: var(--s3); font-size: 11px;
+}
+.cache-flag::before, .cache-flag::after { content: ''; flex: 1; border-top: 1px dashed color-mix(in srgb, var(--s3) 50%, transparent); }
+
+/* SSE event table */
+.sse-summary { display: flex; gap: 16px; font-size: 11px; color: var(--ink-2); margin-bottom: 8px; flex-wrap: wrap; }
+.sse-summary b { color: var(--ink-1); font-variant-numeric: tabular-nums; }
+.sse-list { font-family: var(--mono); font-size: 11px; }
+.sse-item { display: flex; gap: 8px; padding: 2px 4px; border-radius: 4px; cursor: pointer; align-items: baseline; }
+.sse-item:hover { background: color-mix(in srgb, var(--ink-1) 4%, transparent); }
+.sse-item .idx { color: var(--ink-3); width: 40px; flex: 0 0 auto; text-align: right; }
+.sse-item .etype { width: 170px; flex: 0 0 auto; }
+.sse-item .epreview { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.sse-item pre { flex-basis: 100%; }
+.et-message_start { color: var(--s1); }
+.et-content_block_start { color: var(--s2); }
+.et-content_block_delta { color: var(--ink-2); }
+.et-content_block_stop { color: var(--s2); }
+.et-message_delta { color: var(--s5); }
+.et-message_stop { color: var(--s1); }
+.et-error { color: var(--critical); }
+.et-ping { color: var(--ink-3); }
+
+details.raw-sec { margin-bottom: 8px; }
+details.raw-sec summary { cursor: pointer; font-size: 12px; color: var(--ink-2); padding: 4px 0; }
+details.raw-sec pre {
+  margin: 4px 0 0; font-family: var(--mono); font-size: 11px; line-height: 1.5;
+  white-space: pre-wrap; word-break: break-word;
+  background: color-mix(in srgb, var(--ink-1) 3%, transparent);
+  border-radius: 6px; padding: 8px 10px; color: var(--ink-2);
+  max-height: 480px; overflow: auto;
+}
+
+.note { color: var(--ink-3); font-size: 12px; margin: 6px 0; }
+.kv { font-size: 11px; }
+.kv div { display: flex; gap: 10px; padding: 2px 0; }
+.kv .k { color: var(--ink-3); width: 220px; flex: 0 0 auto; font-family: var(--mono); }
+.kv .v { color: var(--ink-2); font-family: var(--mono); word-break: break-all; }
+
+/* ---- Auxiliary / pending / aborted ---- */
+.lineage li.aux-row { opacity: .62; }
+.lineage li.aux-row:hover { opacity: 1; }
+.lineage .rel.auxp { color: var(--ink-3); background: color-mix(in srgb, var(--ink-1) 4%, transparent); }
+.lineage .rel.pend {
+  color: var(--s2); background: color-mix(in srgb, var(--s2) 11%, transparent);
+  animation: act-pulse 1.2s ease-in-out infinite;
+}
+.lineage .rel.abort { color: var(--critical); background: color-mix(in srgb, var(--critical) 9%, transparent); }
+.lineage li.pending { opacity: .8; }
+.tbar-pending { animation: act-pulse 1.2s ease-in-out infinite; }
+.abort-mark { font-size: 9px; fill: var(--critical); }
+
+/* ---- Reading views: Markdown / image preview / tool-param key-values ---- */
+.tabs .spacer { flex: 1; }
+/* The "raw format" toggle fully inherits .btn visuals (including the .on emphasized state); this only handles its placement in the tab bar */
+.tabs button.raw-toggle { align-self: center; flex: 0 0 auto; white-space: nowrap; }
+
+.md { font-size: 12.5px; line-height: 1.65; color: var(--ink-1); overflow-wrap: break-word; }
+.md p { margin: 6px 0; }
+.md h4, .md h5, .md h6 { margin: 12px 0 4px; line-height: 1.4; }
+.md h4 { font-size: 13.5px; } .md h5 { font-size: 12.5px; } .md h6 { font-size: 12px; color: var(--ink-2); }
+/* Bullets/numbering come from the source's original characters (mdmark), not CSS generation (auto-numbering would rewrite the source's digits) */
+.md ul.md-list { margin: 6px 0; padding-left: 10px; list-style: none; }
+.md li { margin: 2px 0; }
+.md li ul.md-list { margin: 2px 0; padding-left: 18px; }
+.md blockquote {
+  margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--border);
+  color: var(--ink-2); background: color-mix(in srgb, var(--ink-1) 3%, transparent);
+}
+.md blockquote .md-qline { margin: 2px 0; }
+.md .md-hr { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.md .md-hr::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
+.md a { color: var(--s1); word-break: break-all; }
+.md .mdurl { word-break: break-all; }
+/* XML-style tags (the prompt's section-delimiting skeleton): quiet small monospace pills, neutral so they don't spend the color budget */
+.md .mdtag {
+  font-family: var(--mono); font-size: .85em; color: var(--ink-2);
+  background: color-mix(in srgb, var(--ink-1) 5%, transparent);
+  border-radius: 4px; padding: 0 3px; word-break: break-all;
+}
+.md code.mdc {
+  font-family: var(--mono); font-size: 11.5px; padding: 1px 5px; border-radius: 4px;
+  background: color-mix(in srgb, var(--ink-1) 7%, transparent);
+}
+.md pre.mdpre {
+  font-family: var(--mono); font-size: 11px; line-height: 1.5; margin: 2px 0;
+  padding: 10px 12px; border-radius: 6px; overflow-x: auto;
+  background: color-mix(in srgb, var(--ink-1) 4%, transparent); border: none;
+  white-space: pre;
+}
+.md .mdpre-wrap { margin: 8px 0; }
+.md .md-fence { font-size: 10.5px; } /* selectable — what you copy is the original text */
+.md table.mdtable { border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+.md .mdtable th, .md .mdtable td { border: 1px solid var(--border); padding: 4px 10px; text-align: left; }
+.md .mdtable th { background: color-mix(in srgb, var(--ink-1) 4%, transparent); font-weight: 600; }
+.block .md.clamp { max-height: 280px; }
+.thinking-block .md { color: var(--ink-2); font-size: 12px; }
+
+.tool-kv {
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid var(--content-edge); background: var(--content-bg);
+  border-radius: 8px; padding: 9px 12px;
+}
+/* A pre nested inside the container gets no second border; only a slightly deeper background distinguishes it */
+.tool-kv pre { border: none; background: color-mix(in srgb, var(--ink-1) 4%, transparent); }
+.tkv-row { display: flex; gap: 10px; align-items: baseline; font-size: 12px; }
+.tkv-k { font-family: var(--mono); color: var(--ink-3); flex: 0 0 auto; min-width: 90px; font-size: 11px; }
+.tkv-v { color: var(--ink-1); font-family: var(--mono); font-size: 11.5px; word-break: break-all; }
+.tkv-v.tkv-lit { color: var(--s5); }
+.tkv-block { flex: 1; min-width: 0; }
+.tkv-block pre { margin: 0; }
+.tkv-empty { color: var(--ink-3); font-size: 11px; }
+
+.img-preview {
+  display: block; max-width: 100%; max-height: 240px; margin-top: 6px;
+  border: 1px solid var(--border); border-radius: 6px; cursor: zoom-in; object-fit: contain;
+}
+.img-preview.expanded { max-height: none; cursor: zoom-out; }
+
+/* ---- Message role differentiation: restrained color budget — dot + label text color + very light header wash; the container body stays neutral ---- */
+.msg .msg-head .role-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto;
+  background: var(--ink-3);
+}
+.msg.role-user .role-dot { background: var(--s1); }
+.msg.role-assistant .role-dot { background: var(--s5); }
+.msg.role-system .role-dot { background: var(--s3); }
+.msg.new { border-left: 2px solid color-mix(in srgb, var(--s2) 50%, transparent); }
+
+/* ---- Block-type differentiation: structure carried by the unified content container, type identified by btag text; only errors keep a semantic color ---- */
+.block.block-tool_error pre {
+  border-color: color-mix(in srgb, var(--critical) 30%, transparent);
+  background: color-mix(in srgb, var(--critical) 4%, transparent);
+}
+
+/* ---- Markdown render-view container: same container language as pre / tool-param box ---- */
+.block .md {
+  border: 1px solid var(--content-edge);
+  border-radius: 8px;
+  padding: 10px 13px;
+  background: var(--content-bg);
+}
+.md .mdmark { color: var(--ink-3); font-family: var(--mono); font-size: .8em; font-weight: 400; }
+.thinking-block .md { border-style: dashed; }
+
+/* ---- Image lightbox ---- */
+.lightbox {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(10, 12, 16, .85);
+  display: flex; align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+.lightbox img {
+  max-width: 94vw; max-height: 92vh; object-fit: contain;
+  border-radius: 4px; box-shadow: 0 8px 40px rgba(0,0,0,.5);
+  background: #fff;
+}
+.lightbox-hint {
+  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+  color: rgba(255,255,255,.75); font-size: 12px; user-select: none;
+}
+
+/* Platform UI hints (not data) — dimmed styling clearly distinct from data chips */
+.ui-hint { color: var(--ink-3); font-size: 10px; margin-left: 8px; }
+
+/* ---- Agents (subagent / teammate / workflow agent) ---- */
+
+/* Agent groups in the lineage: attached after the spawning request, using the unified content-container language (--content-bg rounded surface);
+   identity via the ⊂ glyph + text, introducing no new color */
+.lineage li.agent-group {
+  display: block; padding: 0; cursor: default;
+  border: 1px solid var(--content-edge); background: var(--content-bg);
+  border-radius: 10px; margin: 4px 0 6px 38px; overflow: hidden;
+}
+.lineage li.agent-group:hover { background: var(--content-bg); }
+.agent-group .ag-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; cursor: pointer; font-size: 12px; color: var(--ink-2);
+  user-select: none;
+}
+.agent-group .ag-head:hover { background: color-mix(in srgb, var(--ink-1) 4%, transparent); }
+.agent-group .ag-chevron { color: var(--ink-3); font-size: 10px; width: 10px; flex: 0 0 auto; }
+.agent-group .ag-glyph { color: var(--ink-3); font-family: var(--mono); flex: 0 0 auto; }
+.agent-group .ag-label { font-weight: 600; color: var(--ink-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-group .ag-type {
+  flex: 0 0 auto; font-size: 10px; font-family: var(--mono); color: var(--ink-3);
+}
+.agent-group .ag-spawn { flex: 0 0 auto; color: var(--s1); cursor: pointer; font-size: 11px; }
+.agent-group .ag-stats {
+  margin-left: auto; flex: 0 0 auto; font-size: 11px; color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.agent-group ul.agent-members { padding: 0 6px 6px; }
+.agent-group ul.agent-members li { padding: 5px 6px; }
+
+/* Timeline: agent swimlane labels + spawn connector lines */
+svg.chart .lane-label.lane-agent { fill: var(--ink-3); }
+svg.chart .spawn-link {
+  fill: none; stroke: var(--baseline); stroke-width: 1.2;
+  stroke-dasharray: 3 3;
+}
+svg.chart .spawn-dot { fill: var(--baseline); }
+
+/* ---- Turn structure + gap attribution + cache breaks — the temporal truth of the agent loop ---- */
+
+/* Timeline: local tool-execution gaps (the window between the parent response's tool_use → the child request's tool_result),
+   encoded as a diagonal-stripe texture — hue is reserved exclusively for model identity */
+svg.chart .gap-bar { cursor: pointer; }
+svg.chart .gap-bar:hover { fill: var(--ink-3); }
+/* Timeline: turn boundaries (each new user input) */
+svg.chart .turn-line { stroke: var(--baseline); stroke-dasharray: 2 3; }
+svg.chart .turn-tick { fill: var(--ink-3); font-size: 9px; }
+
+/* Main-chain time-composition summary (inside the timeline card) */
+.time-split .split-bar {
+  flex: 0 0 150px; display: inline-flex; height: 6px; border-radius: 3px; overflow: hidden;
+  background: color-mix(in srgb, var(--ink-1) 5%, transparent); align-self: center;
+}
+.time-split .split-bar i { display: block; height: 100%; }
+.time-split b { color: var(--ink-1); font-variant-numeric: tabular-nums; }
+
+/* Lineage: turn section headers — the session's top-level structure (each new user input).
+   Sticky at top: while scrolling a long turn you always know which turn you're reading; bleeding to the card edge ensures the rows below are covered */
+.lineage li.turn-sep {
+  /* Chrome takes the sticky containing box inside the padding; the negative offset makes the header hug the pane's visible top edge (no gap showing) */
+  position: sticky; top: calc(-1 * var(--pane-pt)); z-index: 2;
+  cursor: default; border-radius: 0;
+  margin: 6px calc(-1 * var(--card-px)) 2px;
+  padding: 9px calc(var(--card-px) + 8px) 6px;
+  background: var(--surface-1);
+  border-top: 1px dashed var(--grid); border-bottom: 1px solid var(--grid);
+  color: var(--ink-3); font-size: 11px;
+  scroll-margin-top: 0;
+}
+.lineage li.turn-sep:hover { background: var(--surface-1); }
+.lineage li.turn-sep:first-child { border-top: none; margin-top: 0; }
+.turn-sep .turn-no {
+  flex: 0 0 auto; font-size: 10px; font-weight: 650; color: var(--ink-2);
+  text-transform: uppercase; letter-spacing: .4px;
+}
+.turn-sep .turn-label {
+  flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--ink-1);
+}
+.turn-sep .turn-stats { margin-left: auto; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+/* Input identity at a turn's start: slash commands stand out in monospace (explicit user actions); injections/backfills/continuations are dimmed (machine talk) */
+.tl-cmd { font-family: var(--mono); font-size: 11px; color: var(--ink-1); }
+.tl-inj { color: var(--ink-3); }
+.slabel.sl-cmd { font-family: var(--mono); font-size: 11.5px; }
+
+/* Cache-break badge and detail warning (amber = anomaly semantic color family) */
+.lineage .rel.break {
+  color: color-mix(in srgb, var(--s3) 78%, var(--ink-1));
+  background: color-mix(in srgb, var(--s3) 13%, transparent);
+}
+.relation-note.warn-note {
+  background: color-mix(in srgb, var(--s3) 9%, transparent);
+  border-color: color-mix(in srgb, var(--s3) 35%, transparent);
+}
+
+/* Topbar rate limit (warns when remaining headroom drops below 15%) */
+.topbar-meta .rl-warn b { color: var(--critical); }
+
+/* Cache TTL countdown (warns under 1 minute, amber anomaly color) */
+.ttl-count.ttl-soon { color: color-mix(in srgb, var(--s3) 78%, var(--ink-1)); font-weight: 600; }
+
+/* Context-composition chart: model-limit reference line */
+svg.chart .limit-line { stroke: var(--critical); stroke-width: 1; stroke-dasharray: 5 4; opacity: .5; }
+svg.chart .limit-label { fill: var(--critical); opacity: .75; }
+
+/* Detail-page request-parameter row */
+.detail-head .param-line { font-family: var(--mono); font-size: 10.5px; gap: 4px 12px; }
+
+/* Timeline drag-select zoom */
+svg.chart .zoom-band {
+  fill: color-mix(in srgb, var(--s1) 16%, transparent);
+  stroke: color-mix(in srgb, var(--s1) 50%, transparent);
+  stroke-width: 1;
+}
+
+/* ---------------------------------------------------------------- Narrow-window adaptation
+   Half-screen side-by-side terminal is the primary use case. Pane internals use container queries (width depends on detail open/closed and sidebar expanded/collapsed,
+   not on window width); topbar/sidebar use media queries. Restrained breakpoints: only one per pane. */
+
+/* The session pane has a single breakpoint: the nav-rail tier (with detail open the list keeps ~230-360px).
+   Above that, width adapts continuously via flex (desc flex-truncates, ctxbar can shrink) with no multi-tier jumps.
+   Nav rail = pure navigation: keep identity and content (seq/model dot/badge/description); the metric columns yield as a whole;
+   metrics remain in the row tooltip and the detail pane. */
+@container (max-width: 460px) {
+  #session-pane { --pane-pt: 10px; padding: var(--pane-pt) 10px; }
+  .card { --card-px: 10px; padding-top: 10px; padding-bottom: 10px; }
+  .card h2 .sub { display: none; }
+  .card .legend { gap: 8px; }
+  .tiles { gap: 6px; }
+  .tile { padding: 8px 10px; }
+  .tile .tv { font-size: 17px; }
+  .lineage li { gap: 6px; padding: 6px; }
+  .lineage .seq { width: 26px; }
+  .lineage .ctxbar, .lineage .tok, .lineage .dur { display: none; }
+  .turn-sep .turn-stats { display: none; }
+  .lineage li.agent-group { margin-left: 20px; }
+  .agent-group .ag-stats, .agent-group .ag-type, .agent-group .ag-spawn { display: none; }
+}
+
+/* Detail pane narrows: tabs/padding tighten (the tab bar itself can scroll horizontally) */
+@container (max-width: 520px) {
+  .detail-head { padding: 10px 12px 0; }
+  .tabs { padding: 0 12px; }
+  .tabs button { padding: 8px 7px; font-size: 11px; }
+  .tab-body { padding: 10px 12px 32px; }
+  .detail-head .meta { gap: 4px 10px; }
+  .mini-usage { gap: 6px; }
+  .mini-usage .mu { padding: 4px 8px; }
+  .kv .k { width: 150px; }
+}
+
+/* Topbar/sidebar: shrink progressively with window width — secondary stats yield first */
+@media (max-width: 1260px) {
+  .topbar-meta .m-hide-lg { display: none; }
+}
+@media (max-width: 1100px) {
+  #sidebar { width: 216px; }
+  .topbar-meta { gap: 12px; }
+  #search { width: 170px; }
+  #search:focus { width: min(300px, 38vw); }
+}
+@media (max-width: 960px) {
+  .topbar-meta .m-hide-md { display: none; }
+  header.topbar h1 span { display: none; } /* subtitle yields; tool name stays */
+  #search { width: 140px; }
+  #sidebar { width: 196px; }
+}
+/* Small windows: the search-results panel detaches from the input anchor and is fixed full-width below the topbar */
+@media (max-width: 760px) {
+  #search-results {
+    position: fixed; left: 12px; right: 12px; top: 46px; width: auto; max-width: none;
+  }
+}
+
+/* ---- SSE generation dynamics ---- */
+.sse-item .etime { color: var(--ink-3); width: 60px; flex: 0 0 auto; text-align: right; font-variant-numeric: tabular-nums; }
+svg.sse-curve { margin: 2px 0 10px; }
+svg.sse-curve .curve-line { fill: none; stroke: var(--ink-2); stroke-width: 1.4; }
+
+/* ---- System/Tools diff comparison ---- */
+.diff-view { margin: 8px 0; }
+.diff-block { margin: 6px 0; font-size: 12px; color: var(--ink-2); }
+.diff-block .diff-tag { display: inline-block; font-size: 10px; font-family: var(--mono); margin-bottom: 3px; }
+.diff-del .diff-tag { color: var(--critical); }
+.diff-add .diff-tag { color: var(--good-text); }
+.diff-mod .diff-tag { color: var(--s3); }
+.diff-block pre {
+  margin: 0; font-family: var(--mono); font-size: 11px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; color: var(--ink-2);
+  border-radius: 8px; padding: 8px 11px; max-height: 300px; overflow: auto;
+  background: var(--content-bg); border: 1px solid var(--content-edge);
+}
+.diff-del pre {
+  border-color: color-mix(in srgb, var(--critical) 30%, transparent);
+  background: color-mix(in srgb, var(--critical) 5%, transparent);
+}
+.diff-add pre {
+  border-color: color-mix(in srgb, var(--good-text) 30%, transparent);
+  background: color-mix(in srgb, var(--good-text) 6%, transparent);
+}
+.diff-block .clamp { max-height: 120px; overflow: hidden; }
+.diff-block .expand-btn { margin-top: 3px; }

@@ -1,0 +1,5 @@
+data/
+data-demo/
+node_modules/
+.DS_Store
+*.tgz
